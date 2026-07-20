@@ -540,7 +540,8 @@ named rather than left as a vague "could investigate further."
 | Near-player detection | 91.3–99.8% (mean 96.4%, median 98.3%), consistent across all 10 clips |
 | Near-player position error | 57.8–91.8px median |
 | Far-player detection (adequately-sampled clips, n≥20) | 0–34% (mean 10.5%) — genuine hardware limit, confirmed via threshold and model-size tests |
-| Ball detection rate (9 of 10 clips, 1 broadcast-quality outlier excluded) | ~7–9% (mean 7.8%, median 4.9%) |
+| Ball detection, stock YOLO (9 of 10 clips, 1 broadcast-quality outlier excluded) | ~7–9% (mean 7.8%, median 4.9%) |
+| Ball detection, combined YOLO + motion-diff (production method, `ball_detection_combined.py`) | **53.91% pooled recall** (video3 excluded, 9-clip scope) — a real ~6.9x improvement, but corrected down from an initially-reported 70.40% after a ground-truth leak was found and fixed in the candidate-selection logic; see Addendum (2026-07-19) |
 | Ball position error, when detected | 2.3–4.1px median, consistent across all 10 clips |
 | Homography, independently validated | 1 of 10 clips (~13px / ~8cm real-world error) |
 | Homography, confirmed bad and excluded | 1 of 10 clips |
@@ -579,9 +580,12 @@ confirming it wasn't also a correctness regression.
 | component | tests | status |
 |---|---|---|
 | v1 (`tennis-intelligence-platform`) | 211 | all passing (post-fix) |
-| `rag_engine` | 17 | all passing |
+| `cv_pipeline` | 29 | all passing (includes shot-classification, ball-trajectory-Kalman, calibration-verification, and the experimental Hough-detection module's own tests — see Addendum (2026-07-19)) |
+| `rag_engine` | 19 | all passing |
 | `llm_agent` | 5 | all passing (mocked; grounding verified separately via the 10-question + 3-spot-check manual evaluation, §3) |
-| `v2_serving` | 18 | all passing, 10.24s total, including 2 real (unmocked) regression-guard calls into v1's engine asserting exact values |
+| `v2_serving` | 29 | all passing, including real (unmocked) regression-guard calls into v1's engine asserting exact values |
+
+(Counts above are as of the most recent full-suite run across all five components, 2026-07-20 — see `VERIFICATION.md` to reproduce.)
 
 ---
 
@@ -659,3 +663,126 @@ This is the same pattern as the rest of the project: a suspicious number was
 investigated with real measurements, a real fix was found and adopted, and —
 notably here — a second, independently-reported symptom turned out to share the
 same root cause rather than needing its own separate investigation.
+
+## Addendum (2026-07-19): Ball detection recall, serve classification, automated calibration, and rendered output video
+
+Four further pieces of work, done after the addendum above, none reflected in §3/§6
+until this update. Full detail for all of it is in `PROGRESS.md`; this section gives
+the accurate, current headline numbers and the shape of each investigation, in the
+same spirit as the rest of this report — including where a first-reported number
+turned out to be wrong and had to be corrected.
+
+### Ball detection: motion-diff recovery, 7.8% → 53.91% pooled recall — including a self-caught ground-truth leak
+
+Stock YOLOv8n's ~7.8% ball-detection recall (§6.2) is a recall problem, not a
+precision one — the model rarely finds the ball, but is accurate to 2–4px when it
+does. Restricting a grayscale frame-difference to the clip's actual homography-derived
+court region, and using it as a fallback wherever YOLO finds nothing, recovers most of
+that gap on the locked-off amateur dataset: **pooled recall across 9 clips (video3
+excluded) went from 7.81% to 53.91%**, a real ~6.9x improvement, visually spot-checked
+against ground truth on isolated-ball frames, not just trusted from the aggregate
+number. A separate check confirmed this does **not** transfer to broadcast footage
+with two players moving in frame simultaneously — motion-diff there mostly
+re-detects player footwork, a genuine negative finding reported rather than
+suppressed (`BALL_DETECTION_EXPERIMENTS_REPORT.md`).
+
+**The number was wrong once, and the project caught its own mistake before shipping
+it.** An early prototype reported 70.40% pooled recall. Per this project's standing
+rule — never trust a number from a standalone prototype script, only from the actual
+production code path — the full validation suite was re-run through the real
+`ball_detection_combined.run_combined_ball_detection_for_clip` function
+(the same one `video_pipeline.py` calls), not the prototype. That re-run came back at
+46.24%, far below 70.40%. Line-by-line comparison found the cause: the prototype
+picked which motion-diff candidate to trust, when several existed in one frame, by
+choosing whichever was **closest to the real ground-truth ball position** — something
+no system can do at real inference time, since ground truth doesn't exist then. This
+is a ground-truth leak, the same failure class the project had already named and
+guarded against elsewhere (§4.1's fabrication catch). **Fixed** by picking the
+largest-area candidate instead (a legitimate heuristic — the real ball has a specific
+physical size) and re-measuring: **53.91% final**, corrected everywhere the invalid
+70.40% had been cited. Still a real, large win over stock YOLO — just not the number
+first claimed.
+
+### Serve-exclusion for shot classification: a narrow, evidence-backed rule, not the general heuristic first proposed
+
+`shot_classification.py` detects swing events from pose-landmark motion. The first
+swing in a rally is usually a serve, not a groundstroke, and including it inflated
+apparent shot-detection activity with an event type the classifier wasn't built to
+distinguish. Three candidate signals for a general "was this preceded by a
+motion lull" serve-detector were proposed and tested against real labeled data —
+**all three were falsified** (event-gap timing, ball-density-before-event, and
+ball-spatial-spread all failed to reliably separate real serves from real
+groundstrokes on manual audit). Rather than ship a heuristic that sounded reasonable
+but didn't hold up, the project shipped the one rule that **did** survive testing:
+flag only the single earliest event across both players' roles as a probable serve —
+narrow, but correct where it fires.
+
+**Manually audited, not assumed** (the same per-event checklist — facing direction,
+zoom, frame-by-frame confirmation — used throughout this project's CV validation):
+final contamination figures, after also fixing two real integration bugs found during
+wiring (a peak-detection boundary-starvation bug near `frame_limit`, fixed directly
+by padding the detection window; and a sampling-density gap between the audit's
+every-2nd-frame sample and production's every-frame sampling, resolved by a targeted
+re-audit of the newly-visible events) — **87.5% of flagged non-serve events are real
+shots, 14.6% contamination, confirmed stable under the actual production
+configuration** (`PlayerContinuityTracker`, full-resolution sampling). Wired into
+`video_pipeline.py` and the dashboard overlay only after this verification, not before.
+
+### Automated Hough-transform court-corner detection — a promising but not-yet-adopted alternative to manual calibration
+
+Every clip in this project has so far required a manually-measured 8-point court
+calibration (see the addendum above for how error-prone that manual process itself
+can be). This experiment tested whether classical Hough-line detection could locate
+the same court corners automatically, measured directly against this project's
+existing manually-traced calibrations as ground truth — not assumed accurate because
+the approach sounds reasonable.
+
+**First pass**: two real bugs, found and fixed by testing against ground truth before
+trusting any result — naive angle-bucket clustering blended unrelated court lines
+together (70–160px mean corner error), and a naive "widest horizontal line" heuristic
+picked the net cord instead of the true far baseline (perspective foreshortening makes
+nearer lines project wider in pixels despite being narrower in real-world terms).
+Fixed via proper (theta, rho) segment clustering and Y-position-based baseline
+selection: **11.8px mean error (1.mp4), 4.1px (3.mp4)**, single frame each,
+comparable to the manual method's own ~2px held-out precision on the better clip.
+
+**Extended to a full multi-frame, multi-clip evaluation (all 5 clips, 8 frames each)**
+per this project's standard of not generalizing from 2 clips/1 frame — which surfaced
+two more real problems, both found and fixed the same way, by measuring rather than
+assuming: (1) a short, poorly-supported line cluster could occasionally out-rank a
+well-supported one by a few pixels of position and then get badly extrapolated, fixed
+by weighting cluster selection toward better-covered clusters; (2) a fixed on-screen
+scoreboard graphic's text was being picked up as a false court-line signal — an
+initial pixel-masking fix worked but was found to occasionally destabilize an
+*unrelated* line detection elsewhere in the frame (`cv2.HoughLinesP`'s internal
+randomized voting is sensitive to the total edge-point population, not just local
+pixels — confirmed directly, and a same-value "neutral fill" test proved the fill
+value was never the actual variable), so it was replaced with a structurally safer
+post-hoc filter on detected segments instead of a pixel mask. Combined with switching
+multi-frame aggregation from mean to median (a general robustness layer against
+ordinary per-frame noise, unrelated to the scoreboard mechanism): **overall mean
+corner error across all 5 clips dropped from 6.8px to 5.14px, every clip at or below
+its own original baseline.**
+
+**Status: still experimental, correctly not adopted.** Deliberately named outside the
+`reference_video*_calibration.py` pattern so it does not trigger the mandatory
+calibration-verification-manifest gate (`test_calibration_verification.py`) that
+every real calibration in this project must pass — it hasn't gone through that
+process, and two corners in two clips (2.mp4's BL, 5.mp4's BR) remain meaningfully
+worse than the manual method's sub-2px precision. Treated as a candidate to keep
+comparing against the manual method, not a replacement, consistent with this
+project's standard of not shipping something because a result looks promising in
+isolation.
+
+### Rendered output video with shot-detection overlay
+
+A server-side rendering feature (`v2_serving/src/v2_serving/video_render.py`) burns
+the detected court outline, player/ball boxes, and shot-classification events
+directly into an output `.mp4`, exposed via a job-based API matching the existing
+async-job conventions. **A real, user-facing bug was found and fixed after initial
+delivery**: the first render used the `mp4v` FourCC, which produces MPEG-4 Part 2 —
+not playable in any mainstream browser despite downloading successfully (confirmed by
+inspecting the actual file's FourCC via OpenCV, not by assumption). Fixed by switching
+to `avc1` (real H.264, empirically verified against this machine's OpenCV/FFmpeg
+build) and adding a regression test asserting the output codec is never `mp4v`/`FMP4`
+again. Every frame of a full clip (2,020 frames) renders in ~21s.
