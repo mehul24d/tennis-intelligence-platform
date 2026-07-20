@@ -1,0 +1,52 @@
+{
+  "clip": "video1",
+  "n_frames": 689,
+  "fps": 60.09,
+  "homography": {
+    "geometric_sanity_status": "measured",
+    "real_world_scale_status": "measured",
+    "real_world_distance_metrics_usable": true,
+    "note": "Independently validated against the baseline center hash mark (a landmark never used in calibration): predicted vs. measured position agreed to ~13px (~8cm real-world). Safe to use for real-world-distance-derived metrics."
+  },
+  "player_r_detection": {
+    "status": "measured",
+    "rate": 0.918,
+    "n": 668,
+    "median_error_px": 75.8,
+    "note": null
+  },
+  "player_l_detection_separated": {
+    "status": "measured",
+    "rate": 0.208,
+    "n": 96,
+    "median_error_px": 134.4,
+    "note": null
+  },
+  "player_l_detection_ambiguous": {
+    "status": "measured",
+    "rate": 0.078,
+    "n": 565,
+    "median_error_px": null,
+    "note": "'Ambiguous' bucket: player_r/player_l ground truth were <200px apart, likely both pointing near the same physical player (see steps 4-5) -- a low match rate here is largely a ground-truth artifact, not a pure detection miss. Not a trustworthy far-player accuracy estimate either way."
+  },
+  "ball_detection": {
+    "status": "measured",
+    "rate": 0.028,
+    "n": 250,
+    "median_error_px": 3.8,
+    "note": null
+  },
+  "tracking": {
+    "player_r_n_segments": 1,
+    "player_l_n_segments": 1,
+    "n_id_swaps": 0,
+    "hard_moment_frame_count": 1,
+    "hard_moment_coverage_status": "insufficient_sample",
+    "note": "Only 1 hard-moment frame(s) -- thin coverage, treat any conclusion as weak."
+  },
+  "pose": {
+    "near_player_status": "measured",
+    "far_player_status": "not_attempted",
+    "note": "Near: clean, accurate landmarks on a frontal ready-stance. Far: YOLO found no far-player box at all in the tested frame -- pose couldn't be attempted (cascading from detection weakness)."
+  }
+}

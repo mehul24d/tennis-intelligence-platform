@@ -1,0 +1,52 @@
+{
+  "clip": "video7",
+  "n_frames": 773,
+  "fps": 60.0,
+  "homography": {
+    "geometric_sanity_status": "measured",
+    "real_world_scale_status": "excluded_known_issue",
+    "real_world_distance_metrics_usable": false,
+    "note": "Root-caused: annotated court corners span only the near half-court (baseline to net, ~11.9m), not the full doubles court (23.77m) -- confirmed by matching the implied real-world span to baseline-to-net distance within 2.8%. Geometrically self-consistent (0px reprojection error) but WRONG SCALE. Excluded from all real-world-distance metrics until a per-clip length-correction is implemented."
+  },
+  "player_r_detection": {
+    "status": "measured",
+    "rate": 0.988,
+    "n": 773,
+    "median_error_px": 68.7,
+    "note": null
+  },
+  "player_l_detection_separated": {
+    "status": "measured",
+    "rate": 0.0,
+    "n": 45,
+    "median_error_px": null,
+    "note": null
+  },
+  "player_l_detection_ambiguous": {
+    "status": "measured",
+    "rate": 0.022,
+    "n": 728,
+    "median_error_px": null,
+    "note": "'Ambiguous' bucket: player_r/player_l ground truth were <200px apart, likely both pointing near the same physical player (see steps 4-5) -- a low match rate here is largely a ground-truth artifact, not a pure detection miss. Not a trustworthy far-player accuracy estimate either way."
+  },
+  "ball_detection": {
+    "status": "measured",
+    "rate": 0.026,
+    "n": 269,
+    "median_error_px": 3.7,
+    "note": null
+  },
+  "tracking": {
+    "player_r_n_segments": 1,
+    "player_l_n_segments": 2,
+    "n_id_swaps": 1,
+    "hard_moment_frame_count": 4,
+    "hard_moment_coverage_status": "insufficient_sample",
+    "note": "Only 4 hard-moment frame(s) -- thin coverage, treat any conclusion as weak."
+  },
+  "pose": {
+    "near_player_status": "measured",
+    "far_player_status": "not_applicable",
+    "note": "Near: clean, accurate landmarks (ready stance, back to camera)."
+  }
+}

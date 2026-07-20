@@ -1,0 +1,52 @@
+{
+  "clip": "video9",
+  "n_frames": 627,
+  "fps": 60.0,
+  "homography": {
+    "geometric_sanity_status": "measured",
+    "real_world_scale_status": "unvalidated",
+    "real_world_distance_metrics_usable": false,
+    "note": "Passes geometric self-consistency checks (0px reprojection error, near-baseline pixel span > far-baseline span as perspective requires) but was NOT independently checked against a real-world landmark the way video1 and video7 were. Given video7 was found to have a real, non-obvious scale error despite passing the same self-consistency checks, this clip's real-world scale should be treated as unconfirmed, not assumed correct, until individually validated."
+  },
+  "player_r_detection": {
+    "status": "measured",
+    "rate": 0.914,
+    "n": 395,
+    "median_error_px": 80.9,
+    "note": null
+  },
+  "player_l_detection_separated": {
+    "status": "measured",
+    "rate": 0.204,
+    "n": 152,
+    "median_error_px": 128.0,
+    "note": null
+  },
+  "player_l_detection_ambiguous": {
+    "status": "measured",
+    "rate": 0.027,
+    "n": 187,
+    "median_error_px": null,
+    "note": "'Ambiguous' bucket: player_r/player_l ground truth were <200px apart, likely both pointing near the same physical player (see steps 4-5) -- a low match rate here is largely a ground-truth artifact, not a pure detection miss. Not a trustworthy far-player accuracy estimate either way."
+  },
+  "ball_detection": {
+    "status": "measured",
+    "rate": 0.159,
+    "n": 170,
+    "median_error_px": 4.0,
+    "note": null
+  },
+  "tracking": {
+    "player_r_n_segments": 1,
+    "player_l_n_segments": 1,
+    "n_id_swaps": 0,
+    "hard_moment_frame_count": 0,
+    "hard_moment_coverage_status": "not_applicable",
+    "note": "Zero genuine crossing/proximity frames occurred in this clip (corrected, top-2-confidence-box proxy). Any 'no ID swap' result here is NOT evidence the tracker handles crossings/occlusion well -- this clip never tested that."
+  },
+  "pose": {
+    "near_player_status": "not_applicable",
+    "far_player_status": "not_detected",
+    "note": "Far: YOLO DID correctly detect the far player (after fixing a box-selection bug in the spot-check script itself, which had first picked a sideline bystander) -- but MediaPipe produced ZERO landmarks on the correctly-boxed ~55x66px, motion-blurred crop."
+  }
+}

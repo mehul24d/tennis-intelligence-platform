@@ -1,0 +1,178 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Backgrounds — near-black graphite, not pure black */
+  --background: 222 28% 5%;
+  --background-elevated: 222 26% 8%;
+  --foreground: 210 20% 96%;
+
+  /* Cards — one step up from background, soft border rather than heavy shadow */
+  --card: 222 26% 9%;
+  --card-foreground: 210 20% 96%;
+  --card-border: 217 24% 16%;
+
+  --border: 217 24% 16%;
+  --muted: 217 20% 13%;
+  --muted-foreground: 215 16% 68%;
+
+  /* Accent palette — ATP blue (primary), neon green (positive/win), gold
+     (highlight/peak), never rainbow. Every accent use traces to one of these. */
+  --accent-blue: 210 90% 58%;
+  --accent-green: 152 69% 45%;
+  --accent-gold: 42 87% 55%;
+  --accent-red: 355 78% 60%;
+
+  /* Surface colors — used ONLY where surface is the actual subject (badges,
+     court-context accents), never as decoration. Converted precisely from
+     real-world reference values: clay #c65d2e, grass #3f7d4f,
+     hard court #2f6fb0, ball #d4e157 (used sparingly — it reads as a warning
+     color at full saturation, so it's reserved for small, specific accents). */
+  --surface-clay: 19 62% 48%;
+  --surface-grass: 135 33% 37%;
+  --surface-hard: 210 58% 44%;
+  --surface-ball: 66 70% 61%;
+
+  --accent: var(--accent-blue);
+  --accent-foreground: 210 20% 98%;
+
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  font-feature-settings: "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.font-stat {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.02em;
+}
+
+.text-display {
+  font-size: 2.75rem;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.text-page-title {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.text-section-title {
+  font-size: 1.05rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.text-stat-xl {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 2.25rem;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-feature-settings: "tnum";
+}
+.text-stat-lg {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 1.5rem;
+  line-height: 1.1;
+  font-weight: 600;
+  font-feature-settings: "tnum";
+}
+.text-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+.text-caption {
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.glass {
+  background:
+    linear-gradient(180deg, hsla(217, 30%, 14%, 0.5), hsla(222, 30%, 9%, 0.5));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid hsla(217, 24%, 24%, 0.5);
+}
+
+.card-elevated {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--card-border));
+  border-radius: var(--radius);
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+.card-elevated:hover {
+  border-color: hsla(210, 90%, 58%, 0.35);
+}
+
+.court-texture {
+  background-image:
+    linear-gradient(hsla(210, 90%, 58%, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, hsla(210, 90%, 58%, 0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* A restrained nod to the three Grand Slam surfaces — a single 2px line, used
+   once, not repeated as decoration throughout the app. */
+.surface-accent-line {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--surface-clay)) 0%,
+    hsl(var(--surface-clay)) 33%,
+    hsl(var(--surface-grass)) 33%,
+    hsl(var(--surface-grass)) 66%,
+    hsl(var(--surface-hard)) 66%,
+    hsl(var(--surface-hard)) 100%
+  );
+  opacity: 0.6;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 999px;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsla(217, 20%, 20%, 1) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}

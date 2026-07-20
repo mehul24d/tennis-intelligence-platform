@@ -1,0 +1,118 @@
+{
+  "clip": "data/tennis/2.mp4 (pre-pan segment, frames 0-399 -- see reference_video2_postpan_calibration.py for the separate post-pan segment, frames ~560-1343)",
+  "calibration_module": "cv_pipeline.reference_video2_calibration",
+  "frame_indices": [
+    0,
+    150,
+    390
+  ],
+  "corners_confirmed": {
+    "0": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          174.0,
+          882.0
+        ],
+        "matches": "near-left doubles corner, numeric trace, pre-pan segment"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1732.0,
+          881.0
+        ],
+        "matches": "near-right doubles corner, numeric trace, pre-pan segment"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1333.0,
+          297.0
+        ],
+        "matches": "far-right doubles corner, numeric trace, pre-pan segment"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          579.0,
+          297.0
+        ],
+        "matches": "far-left doubles corner, numeric trace, pre-pan segment"
+      }
+    },
+    "150": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          174.0,
+          881.0
+        ],
+        "matches": "near-left doubles corner, numeric trace -- matches frame 0 within 1px, confirms pre-pan stability"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1732.0,
+          881.0
+        ],
+        "matches": "near-right doubles corner, numeric trace -- matches frame 0 exactly"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1333.0,
+          296.0
+        ],
+        "matches": "far-right doubles corner, numeric trace -- matches frame 0 within 1px"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          579.0,
+          296.0
+        ],
+        "matches": "far-left doubles corner, numeric trace -- matches frame 0 within 1px"
+      }
+    },
+    "390": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          174.0,
+          880.0
+        ],
+        "matches": "near-left doubles corner, numeric trace -- last frame before the pan ramp begins (~400), still matches frames 0/150 within 2px"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1733.0,
+          880.0
+        ],
+        "matches": "near-right doubles corner, numeric trace"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1334.0,
+          296.0
+        ],
+        "matches": "far-right doubles corner, numeric trace"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          579.0,
+          296.0
+        ],
+        "matches": "far-left doubles corner, numeric trace -- re-measured after a first pass mistook a 1-row anti-aliasing fragment at y=295 (a partial, non-representative bright cluster) for the true corner; the real, fully-connected baseline row is y=296, matching frames 0/150 exactly"
+      }
+    }
+  },
+  "confirmed_note": "REDONE 2026-07-19, replacing an earlier manifest found to be invalid during a retroactive audit prompted by discovering a project-wide cv2.CAP_PROP_POS_FRAMES seeking bug (see reference_video5_calibration.py and PROGRESS.md). The audit found that this manifest's previous frame_indices [0, 672, 1343] were compromised: frames 672 and 1343 are OUTSIDE this homography's valid range (frames 0-399 only -- see this module's docstring) and, when checked against real (sequentially-read) frame content, show a genuine ~15-17px vertical shift at the near baseline (BL y=~864-865 at those frames vs y=~880-882 here) -- real POST-PAN camera position, not pre-pan. The previous manifest's recorded pixel values for 672 (BL 200,878) closely matched the POST-PAN calibration's own corner values, not this (pre-pan) calibration's, strongly suggesting that entry was generated from -- or at least is only consistent with -- the wrong, seek-corrupted frame content, not genuine frame 672. That manifest's core claim (this homography verified correct across 3 frames spanning the clip) was false: only frame 0 was ever genuinely, correctly checked. This replacement manifest uses three frames that are ALL within the homography's actual valid range (0, 150, 390 -- start, middle, and the last frame before the pan ramp begins ~400), rendered via the newly-fixed sequential-read render_verification_frames/_frames_at (see calibration_verification.py), and independently re-measured per frame. All 4 corners land tightly on the real court lines at all 3 frames (see calib_check_frame{0,150,390}.jpg in scratchpad/v2_prepan_final/ during this audit -- copy into cv_pipeline/scratch_output if a permanent record is wanted). Note this homography's intended range is 0-399 only; frames beyond that require the separate post-pan calibration (reference_video2_postpan_calibration.py), whose own manifest (video2_postpan.json, frames 560/950/1343) was ALSO re-audited in this same pass and confirmed still valid -- all 3 of its frames show correct, real post-pan content when checked, unlike this one's original frames.",
+  "held_out_error_px": {
+    "near_T": 6.98,
+    "net_base": 1.1
+  }
+}

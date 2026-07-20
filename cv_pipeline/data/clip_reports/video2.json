@@ -1,0 +1,52 @@
+{
+  "clip": "video2",
+  "n_frames": 802,
+  "fps": 60.0,
+  "homography": {
+    "geometric_sanity_status": "measured",
+    "real_world_scale_status": "unvalidated",
+    "real_world_distance_metrics_usable": false,
+    "note": "Passes geometric self-consistency checks (0px reprojection error, near-baseline pixel span > far-baseline span as perspective requires) but was NOT independently checked against a real-world landmark the way video1 and video7 were. Given video7 was found to have a real, non-obvious scale error despite passing the same self-consistency checks, this clip's real-world scale should be treated as unconfirmed, not assumed correct, until individually validated."
+  },
+  "player_r_detection": {
+    "status": "measured",
+    "rate": 0.995,
+    "n": 633,
+    "median_error_px": 61.3,
+    "note": null
+  },
+  "player_l_detection_separated": {
+    "status": "measured",
+    "rate": 0.01,
+    "n": 100,
+    "median_error_px": 97.2,
+    "note": null
+  },
+  "player_l_detection_ambiguous": {
+    "status": "measured",
+    "rate": 0.005,
+    "n": 397,
+    "median_error_px": null,
+    "note": "'Ambiguous' bucket: player_r/player_l ground truth were <200px apart, likely both pointing near the same physical player (see steps 4-5) -- a low match rate here is largely a ground-truth artifact, not a pure detection miss. Not a trustworthy far-player accuracy estimate either way."
+  },
+  "ball_detection": {
+    "status": "measured",
+    "rate": 0.004,
+    "n": 272,
+    "median_error_px": 3.4,
+    "note": null
+  },
+  "tracking": {
+    "player_r_n_segments": 2,
+    "player_l_n_segments": 1,
+    "n_id_swaps": 1,
+    "hard_moment_frame_count": 6,
+    "hard_moment_coverage_status": "insufficient_sample",
+    "note": "Only 6 hard-moment frame(s) -- thin coverage, treat any conclusion as weak."
+  },
+  "pose": {
+    "near_player_status": "not_applicable",
+    "far_player_status": "not_applicable",
+    "note": "Not one of the 6 hand-picked spot-check cases in step 7 -- no pose data for this clip (NOT_APPLICABLE, not silently absent)."
+  }
+}

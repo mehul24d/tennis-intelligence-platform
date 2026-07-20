@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project]
+name = "llm-agent"
+version = "0.1.0"
+description = "Tennis tactical-analyst agent (v2, Phase 2): fuses live win-probability features with RAG-retrieved historical context via Gemini."
+requires-python = ">=3.11"
+
+dependencies = [
+    # rag-engine is not on PyPI -- installed editable side-by-side into the same venv
+    # (see rag_engine/README.md's setup instructions); not declared here since pip
+    # can't resolve a local sibling path as a normal dependency string.
+    "google-genai>=1.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]

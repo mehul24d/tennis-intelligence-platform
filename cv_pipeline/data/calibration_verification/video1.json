@@ -1,0 +1,118 @@
+{
+  "clip": "data/tennis/1.mp4",
+  "calibration_module": "cv_pipeline.reference_video1_calibration",
+  "frame_indices": [
+    0,
+    1010,
+    2019
+  ],
+  "corners_confirmed": {
+    "0": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          200,
+          866
+        ],
+        "matches": "near-left doubles corner, near baseline x left doubles sideline"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1718,
+          866
+        ],
+        "matches": "near-right doubles corner, near baseline x right doubles sideline"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1330,
+          298
+        ],
+        "matches": "far-right doubles corner, far baseline x right doubles sideline"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          598,
+          300
+        ],
+        "matches": "far-left doubles corner, far baseline x left doubles sideline"
+      }
+    },
+    "1010": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          200,
+          867
+        ],
+        "matches": "near-left doubles corner, re-measured independently at mid-clip frame"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1718,
+          868
+        ],
+        "matches": "near-right doubles corner, re-measured independently at mid-clip frame"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1332,
+          300
+        ],
+        "matches": "far-right doubles corner, re-measured independently at mid-clip frame"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          600,
+          299
+        ],
+        "matches": "far-left doubles corner, re-measured independently at mid-clip frame"
+      }
+    },
+    "2019": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          201,
+          864
+        ],
+        "matches": "near-left doubles corner, re-measured independently at last frame"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1719,
+          866
+        ],
+        "matches": "near-right doubles corner, re-measured independently at last frame"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1330,
+          299
+        ],
+        "matches": "far-right doubles corner, re-measured independently at last frame"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          598,
+          301
+        ],
+        "matches": "far-left doubles corner, re-measured independently at last frame"
+      }
+    }
+  },
+  "confirmed_note": "Re-verified 2026-07-19 against the stricter per-corner-coordinate manifest schema. All 4 corners independently re-measured (grid-overlay crops read fresh per frame, not reused from reference_video1_calibration.py) at frames 0, 1010, 2019. BL landed at (200,866)/(200,867)/(201,864) across the 3 frames -- small natural human-read variance, consistent with the confirmed-static camera for this clip (see cv_pipeline/scratch_output/reference_pipeline/calib_verify/v1_BL_f*_clean.jpg and row_v1_{BR,TR,TL}.jpg for the source crops). No mid-clip camera pan found for 1.mp4 (unlike 2.mp4, see PROGRESS.md camera-pan finding) -- all 4 corners stayed within 1-2px across all 3 frames.",
+  "held_out_error_px": {
+    "near_T": 4.4,
+    "net_base": 2.0
+  }
+}

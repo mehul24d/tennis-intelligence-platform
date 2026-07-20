@@ -1,0 +1,118 @@
+{
+  "clip": "data/tennis/3.mp4",
+  "calibration_module": "cv_pipeline.reference_video3_calibration",
+  "frame_indices": [
+    0,
+    466,
+    932
+  ],
+  "corners_confirmed": {
+    "0": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          193,
+          841
+        ],
+        "matches": "near-left doubles corner; numeric pixel-intensity trace (brightness threshold along fixed rows/cols), not eyeballed"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1719,
+          842
+        ],
+        "matches": "near-right doubles corner; numeric pixel-intensity trace"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1336,
+          268
+        ],
+        "matches": "far-right doubles corner; numeric pixel-intensity trace"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          584,
+          268
+        ],
+        "matches": "far-left doubles corner; numeric pixel-intensity trace"
+      }
+    },
+    "466": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          196,
+          837
+        ],
+        "matches": "near-left doubles corner, independently re-traced at mid-clip frame (diagonal-line brightness center at y=836-838)"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1720,
+          837
+        ],
+        "matches": "near-right doubles corner, independently re-traced at mid-clip frame"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1335,
+          267
+        ],
+        "matches": "far-right doubles corner, independently re-traced at mid-clip frame (horizontal-line rightmost bright pixel at y=267)"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          587,
+          267
+        ],
+        "matches": "far-left doubles corner, independently re-traced at mid-clip frame (horizontal-line leftmost bright pixel at y=267)"
+      }
+    },
+    "932": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          196,
+          837
+        ],
+        "matches": "near-left doubles corner, independently re-traced at last frame"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1721,
+          837
+        ],
+        "matches": "near-right doubles corner, independently re-traced at last frame"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1335,
+          267
+        ],
+        "matches": "far-right doubles corner, independently re-traced at last frame"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          586,
+          267
+        ],
+        "matches": "far-left doubles corner, independently re-traced at last frame"
+      }
+    }
+  },
+  "confirmed_note": "Verified 2026-07-19. Camera confirmed static for the whole clip BEFORE calibrating (full-clip 2-column pixel scan, no drift found -- see reference_video3_calibration.py docstring), so one static homography covers all 933 frames. All 4 corners independently re-measured at frames 0, 466 (mid-clip), and 932 (last frame) via numeric pixel-brightness thresholding (not eyeballed grid crops) -- BL reads (193,841)/(196,837)/(196,837) and TR reads (1336,268)/(1335,267)/(1335,267) across the 3 frames, small real variance, consistent with the confirmed-static camera. Rendered overlay visually confirmed tight at all 4 corners on all 3 frames (calib_check_frame0/466/932.jpg in cv_pipeline/scratch_output/tennis3/calib_verify/manifest_frames/). NOTE: the initial calibration pass (eyeballed crop-grid reads) had a near_svc_L outlier residual of 22px vs 3.5-8.8px for the other 7 points -- investigated like a potential mislabeling bug (wide crop first), confirmed the line identity was correct, root-caused as plain eyeballing imprecision, and fixed by switching to numeric brightness-thresholding for all 8 points, dropping held-out error to 1.68px/1.68px (best of any clip so far) with uniform 1.47-4.61px residuals, no outliers.",
+  "held_out_error_px": {
+    "near_T": 1.68,
+    "net_base": 1.68
+  }
+}

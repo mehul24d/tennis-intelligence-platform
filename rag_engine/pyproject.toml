@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project]
+name = "rag-engine"
+version = "0.1.0"
+description = "RAG layer over the Tennis Intelligence Platform's match/player/point dataset (v2)."
+requires-python = ">=3.11"
+readme = "README.md"
+
+dependencies = [
+    "pandas>=2.2",
+    "pyarrow>=15.0",
+    "chromadb>=0.5",
+    "sentence-transformers>=3.0",
+]
+
+[project.optional-dependencies]
+generation = [
+    # google-genai is Google's current, GA (since May 2025) unified Gen AI SDK for
+    # the Gemini API -- NOT google-generativeai, which is deprecated (Nov 30, 2025)
+    # and receives no new-feature support. See generate.py's module docstring.
+    "google-genai>=1.0",
+    "python-dotenv>=1.0",
+]
+dev = [
+    "pytest>=8.0",
+]

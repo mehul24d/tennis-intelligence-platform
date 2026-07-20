@@ -1,0 +1,118 @@
+{
+  "clip": "data/tennis/2.mp4 (post-pan segment, frames ~560-1343)",
+  "calibration_module": "cv_pipeline.reference_video2_postpan_calibration",
+  "frame_indices": [
+    560,
+    950,
+    1343
+  ],
+  "corners_confirmed": {
+    "560": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          197,
+          870
+        ],
+        "matches": "near-left doubles corner, post-pan framing, direct pixel-intensity baseline scan at x=260"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1718,
+          870
+        ],
+        "matches": "near-right doubles corner, post-pan framing, direct pixel-intensity baseline scan at x=1650"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1327,
+          291
+        ],
+        "matches": "far-right doubles corner, post-pan framing, direct pixel-intensity baseline scan at x=1250"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          578,
+          290
+        ],
+        "matches": "far-left doubles corner, post-pan framing, direct pixel-intensity baseline scan at x=650"
+      }
+    },
+    "950": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          197,
+          869
+        ],
+        "matches": "near-left doubles corner -- this is the calibration source frame (960, one frame off); wide-crop check at frame 960 independently read apex (197,864), close agreement"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1718,
+          869
+        ],
+        "matches": "near-right doubles corner -- wide crop at frame 960 confirmed a second, more-inner singles-sideline diagonal exists nearby and is NOT this corner (see wide_BR.jpg)"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1327,
+          290
+        ],
+        "matches": "far-right doubles corner, wide-crop confirmed no second outer line at frame 960 (wide_TR.jpg)"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          578,
+          289
+        ],
+        "matches": "far-left doubles corner, wide-crop confirmed at frame 960 (wide_TL.jpg)"
+      }
+    },
+    "1343": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          197,
+          868
+        ],
+        "matches": "near-left doubles corner, post-pan framing, direct pixel-intensity baseline scan at x=260, last frame of clip"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1718,
+          868
+        ],
+        "matches": "near-right doubles corner, post-pan framing, direct pixel-intensity baseline scan at x=1650, last frame of clip"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1327,
+          289
+        ],
+        "matches": "far-right doubles corner, post-pan framing, direct pixel-intensity baseline scan at x=1250, last frame of clip"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          578,
+          288
+        ],
+        "matches": "far-left doubles corner, post-pan framing, direct pixel-intensity baseline scan at x=650, last frame of clip"
+      }
+    }
+  },
+  "confirmed_note": "Built 2026-07-19 as the post-pan segment calibration after confirming (direct pixel-intensity measurement, not eyeballing) a real ~9-13px mid-clip camera pan in data/tennis/2.mp4 between frames ~400-560 -- see PROGRESS.md camera-pan finding. Calibrated from frame 960 using wide-enough crops (BR apex confirmed at (1718,863) with a second, more-inner singles-sideline diagonal visible and correctly excluded, per cv_pipeline/scratch_output/tennis2/calib_verify_postpan/wide_BR.jpg). Re-verified across the segment at frames 560, 950, 1343 via direct pixel-intensity baseline scans (not reused from the frame-960 calibration source): BL reads (197,870)/(197,869)/(197,868) and BR reads (1718,870)/(1718,869)/(1718,868) across the 3 frames -- small real y-variance (1-2px), x constant (no horizontal pan component, independently confirmed earlier). Rendered overlay visually confirmed tight at all 4 corners on all 3 frames (calib_check_frame560/950/1343.jpg in cv_pipeline/scratch_output/tennis2/calib_verify_postpan/manifest_frames/). Held-out near-T/net-base error 4.30px/1.69px. The ~400-560 ramp frames are deliberately NOT covered by this calibration or reference_video2_calibration.py -- see PROGRESS.md for why.",
+  "held_out_error_px": {
+    "near_T": 4.3,
+    "net_base": 1.69
+  }
+}

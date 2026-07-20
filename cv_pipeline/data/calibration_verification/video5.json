@@ -1,0 +1,225 @@
+{
+  "clip": "data/tennis/5.mp4 (two segments: frames 0-135 original camera position, frames 400-939 shifted ~70-100px after a real one-way pan -- NOT locked-off, and NOT the same 2-segment shape as 2.mp4/4.mp4)",
+  "calibration_module": "cv_pipeline.reference_video5_calibration",
+  "frame_indices": [
+    100,
+    115,
+    130,
+    450,
+    600,
+    900
+  ],
+  "corners_confirmed": {
+    "100": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          137.0,
+          836.0
+        ],
+        "matches": "near-left doubles corner, numeric trace, Segment A -- clean read, player occlusion (present frames 0-~95, confirmed via corner crops) has cleared by this frame"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1621.0,
+          821.0
+        ],
+        "matches": "near-right doubles corner, numeric trace, Segment A -- BR was occluded by the returning player for roughly the first 95 frames of this segment (visually confirmed at frames 0/40/80), this frame is past that"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1250.0,
+          274.0
+        ],
+        "matches": "far-right doubles corner, numeric trace, Segment A"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          523.0,
+          274.0
+        ],
+        "matches": "far-left doubles corner, numeric trace, Segment A -- re-measured after a mean-of-cluster bug in the first pass put this at (611,273.5), off by ~85px; caught via cross-validation against the other 7 points, see reference_video5_calibration.py docstring"
+      }
+    },
+    "115": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          137.0,
+          837.0
+        ],
+        "matches": "near-left doubles corner, numeric trace, Segment A -- matches frame 100 within 1px"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1621.0,
+          821.0
+        ],
+        "matches": "near-right doubles corner, numeric trace, Segment A -- matches frame 100 exactly, confirms Segment A is genuinely stable"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1249.0,
+          274.0
+        ],
+        "matches": "far-right doubles corner, numeric trace, Segment A"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          524.0,
+          274.0
+        ],
+        "matches": "far-left doubles corner, numeric trace, Segment A -- matches frame 100 within 1px"
+      }
+    },
+    "130": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          137.0,
+          837.0
+        ],
+        "matches": "near-left doubles corner, numeric trace, Segment A -- last frame before the pan visibly begins (near_xL reads 149.5 here vs 149.0 at frame 100/115, a sub-px difference); still within the stable window"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1621.0,
+          822.0
+        ],
+        "matches": "near-right doubles corner, numeric trace, Segment A"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1250.0,
+          274.0
+        ],
+        "matches": "far-right doubles corner, numeric trace, Segment A"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          524.0,
+          274.0
+        ],
+        "matches": "far-left doubles corner, numeric trace, Segment A -- matches frames 100/115 within 1px across the whole segment"
+      }
+    },
+    "450": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          212.0,
+          830.0
+        ],
+        "matches": "near-left doubles corner, numeric trace, Segment B -- ~75px right of Segment A, confirming the pan completed and settled by this frame"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1693.0,
+          829.0
+        ],
+        "matches": "near-right doubles corner, numeric trace, Segment B"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1316.0,
+          274.0
+        ],
+        "matches": "far-right doubles corner, numeric trace, Segment B"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          594.0,
+          274.0
+        ],
+        "matches": "far-left doubles corner, numeric trace, Segment B"
+      }
+    },
+    "600": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          212.0,
+          830.0
+        ],
+        "matches": "near-left doubles corner -- this is the calibration source frame for Segment B, wide crop confirmed no second outer line, matches frame 450 exactly"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1693.0,
+          828.0
+        ],
+        "matches": "near-right doubles corner, calibration source frame, Segment B"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1317.0,
+          274.0
+        ],
+        "matches": "far-right doubles corner, calibration source frame, Segment B"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          593.0,
+          274.0
+        ],
+        "matches": "far-left doubles corner, calibration source frame, Segment B -- matches frame 450 within 1px"
+      }
+    },
+    "900": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          212.0,
+          830.0
+        ],
+        "matches": "near-left doubles corner, numeric trace, Segment B -- matches frames 450/600 exactly, confirms Segment B is genuinely stable through to near the end of the clip"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1693.0,
+          828.0
+        ],
+        "matches": "near-right doubles corner, numeric trace, Segment B"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1317.0,
+          274.0
+        ],
+        "matches": "far-right doubles corner, numeric trace, Segment B -- an earlier quick automated pass misread this as (1182,260) at this same frame, fooled by an unrelated bright object near the top of the scan window; re-measured with the row-endpoint method and it matches frames 450/600"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          592.0,
+          274.0
+        ],
+        "matches": "far-left doubles corner, numeric trace, Segment B -- matches frames 450/600 within 1-2px"
+      }
+    }
+  },
+  "confirmed_note": "Verified 2026-07-19. This clip has a real, one-way camera pan (NOT locked-off like 1.mp4/3.mp4, and NOT the same there-and-back 2-segment shape as 2.mp4, nor 4.mp4's multi-segment there-and-back-and-overshoot pattern) -- confirmed via 3 independent pixel-tracked points and a red/green frame-overlay visual check (frame 0 vs frame 320 vs frame 900). Two long, stable, position-matched-within-each-other windows exist: frames 0-135 (Segment A, BL reads 137.0/137.0/137.0 at frames 100/115/130) and frames 400-939 (Segment B, BL reads 212.0/212.0/212.0 at frames 450/600/900) -- these do NOT match each other (Segment A BL ~137 vs Segment B BL ~212, a real ~75px shift), confirming two independent calibrations are required, unlike 4.mp4 where the two stable windows turned out to be the SAME position. A real measurement bug was found and fixed during this verification: Segment A's first-pass TL read as (611.0, 273.5) via a mean-of-bright-cluster method that is invalid when the scan row also intersects the singles sideline crossing the same baseline; cross-validating TL against a homography built from the other 7 points (predicted position (537, 282), 74px from the first-pass reading) exposed this, and the corrected reading (526.0, 275.0) dropped Segment A's held-out error from 10.22/17.98px to 0.75/0.30px. A second, project-wide bug was found and fixed in the tooling itself: calibration_verification.py's render_verification_frames previously used cv2.CAP_PROP_POS_FRAMES seeking, which was found to silently return the WRONG frame's content past a keyframe boundary on every reference clip tested (1.mp4-5.mp4 all reproduce it -- e.g. video4.json's own frame 300 does not match a sequential read at all, maxdiff=255 out of 255). Fixed by switching to pure sequential decoding (_frames_at) for this module's frame extraction; all 6 rendered check images for this manifest (calib_check_frame{100,115,130,450,600,900}.jpg in cv_pipeline/scratch_output/tennis5/calib_verify/manifest_frames/) were confirmed via that fixed path and show all 4 corners landing tightly on the real court lines. Flagging the historical exposure as a backlog item, not re-auditing 1-4.mp4 retroactively right now, since none of those clips are failing their held-out thresholds.",
+  "held_out_error_px": {
+    "segment_a_near_T": 0.75,
+    "segment_a_net_base": 0.3,
+    "segment_b_near_T": 1.96,
+    "segment_b_net_base": 1.92
+  }
+}

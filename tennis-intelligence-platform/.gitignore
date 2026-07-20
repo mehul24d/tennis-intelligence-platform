@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Data (tracked via DVC later, not git)
+data/raw/*
+data/interim/*
+data/processed/*
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/

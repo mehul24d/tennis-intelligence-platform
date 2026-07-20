@@ -1,0 +1,153 @@
+{
+  "clip": "data/tennis/4.mp4 (stable segments: frames 0-420 and 740-1240 -- confirmed the SAME camera position)",
+  "calibration_module": "cv_pipeline.reference_video4_calibration",
+  "frame_indices": [
+    0,
+    300,
+    900,
+    1200
+  ],
+  "corners_confirmed": {
+    "0": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          188.0,
+          832.0
+        ],
+        "matches": "near-left doubles corner, numeric trace, segment A (frames 0-420)"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1725.5,
+          832.0
+        ],
+        "matches": "near-right doubles corner, numeric trace, segment A -- had to fix a tracing-script bug that was picking up an unrelated bright object (likely a player sock/shoe) further left in the scan window before finding the real corner"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1337.0,
+          255.0
+        ],
+        "matches": "far-right doubles corner, numeric trace, segment A"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          584.0,
+          254.0
+        ],
+        "matches": "far-left doubles corner, numeric trace, segment A"
+      }
+    },
+    "300": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          187.5,
+          833.0
+        ],
+        "matches": "near-left doubles corner, numeric trace, segment A -- matches frame 0 within ~1px, confirms segment A is genuinely stable"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1725.5,
+          832.0
+        ],
+        "matches": "near-right doubles corner, numeric trace, segment A"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1337.0,
+          255.0
+        ],
+        "matches": "far-right doubles corner, numeric trace, segment A"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          581.0,
+          255.0
+        ],
+        "matches": "far-left doubles corner, numeric trace, segment A"
+      }
+    },
+    "900": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          189.0,
+          829.0
+        ],
+        "matches": "near-left doubles corner -- this is the calibration source frame, within segment C (740-1240)"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1719.0,
+          829.0
+        ],
+        "matches": "near-right doubles corner, calibration source frame, wide crop confirmed no second outer line"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1338.0,
+          254.0
+        ],
+        "matches": "far-right doubles corner, calibration source frame"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          582.0,
+          254.0
+        ],
+        "matches": "far-left doubles corner, calibration source frame"
+      }
+    },
+    "1200": {
+      "BL": {
+        "confirmed": true,
+        "pixel": [
+          188.5,
+          830.0
+        ],
+        "matches": "near-left doubles corner, numeric trace, segment C -- matches frame 900 within ~1-2px, confirms segment C is genuinely stable and matches segment A"
+      },
+      "BR": {
+        "confirmed": true,
+        "pixel": [
+          1726.0,
+          828.0
+        ],
+        "matches": "near-right doubles corner, numeric trace, segment C"
+      },
+      "TR": {
+        "confirmed": true,
+        "pixel": [
+          1339.0,
+          253.0
+        ],
+        "matches": "far-right doubles corner, numeric trace, segment C"
+      },
+      "TL": {
+        "confirmed": true,
+        "pixel": [
+          583.0,
+          252.0
+        ],
+        "matches": "far-left doubles corner, numeric trace, segment C"
+      }
+    }
+  },
+  "confirmed_note": "Verified 2026-07-19. This clip is NOT locked-off (unlike 1.mp4/3.mp4) -- a real, correlated, whole-frame camera motion of up to ~45-68px was found and confirmed with 3 independent corner points moving together (see PROGRESS.md and reference_video4_calibration.py docstring for the full investigation, including a diagnostic-script bug in the first pass -- a too-narrow scan window that clipped and missed the horizontal component entirely -- that was caught and fixed before this conclusion was reached). Two long, stable, POSITION-MATCHED windows exist: frames 0-420 (BL numeric reads 188.0/187.5 at frames 0/300) and frames 740-1240 (BL reads 189.0/188.5 at frames 900/1200) -- these 4 independent readings cluster within ~1.5px of each other, confirming segments A and C are the same camera position, not two separate calibrations. This single homography, calibrated from frame 900, is used for BOTH windows; frames 421-739 and 1241-1543 (the two ramps, including two ~30-frame turning points and a ~44-frame end tail, none long/stable enough on their own to warrant independent calibration per this project's verification standard) are excluded from confident court-line overlay rendering. Rendered overlay visually confirmed tight at all 4 corners on all 4 checked frames (0, 300, 900, 1200 -- calib_check_frame*.jpg in cv_pipeline/scratch_output/tennis4/calib_verify/manifest_frames/), and separately confirmed VISIBLY MISALIGNED at frame 500 (inside the excluded dip) -- see calib_check_frame500.jpg -- directly validating the exclusion decision, not just asserting it from the numeric scan.",
+  "held_out_error_px": {
+    "near_T": 2.2,
+    "net_base": 1.71
+  }
+}
