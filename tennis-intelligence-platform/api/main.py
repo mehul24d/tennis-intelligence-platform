@@ -12,6 +12,7 @@ and must not be repeated on every API call.
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -37,12 +38,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Permissive CORS for local frontend development (Next.js dev server on a different
-# port). TIGHTEN THIS before any real deployment — this is intentionally wide open
-# only for local dev against a mock/real backend during frontend construction.
+# Allowed origins default to local frontend dev; set ALLOWED_ORIGINS (comma-separated)
+# in the deployment environment to add the deployed frontend's origin(s).
+_default_origins = ["http://localhost:3000"]
+_extra_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_default_origins + _extra_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

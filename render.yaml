@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: tennis-intelligence-api
+    runtime: python
+    plan: free
+    rootDir: tennis-intelligence-platform
+    buildCommand: >
+      pip install -e . &&
+      curl -L https://github.com/mehul24d/tennis-intelligence-platform/releases/download/backend-data-v1/backend-data.tar.gz -o /tmp/backend-data.tar.gz &&
+      tar -xzf /tmp/backend-data.tar.gz -C .
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: ALLOWED_ORIGINS
+        sync: false
+    healthCheckPath: /api/health
