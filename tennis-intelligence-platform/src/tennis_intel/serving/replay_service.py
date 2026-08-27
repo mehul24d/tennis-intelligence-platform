@@ -25,7 +25,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 import joblib
 import pandas as pd
@@ -72,10 +72,23 @@ class ReplayContext:
 
 
 def _load_match_points(match_id: str) -> pd.DataFrame:
-    """Reads ONE match's point-level rows from the partitioned cache on demand —
-    pyarrow's partition pruning means this touches only that match's ~175-row
-    partition on disk, not the full ~1M-row corpus."""
-    return pd.read_parquet(POINTS_CACHE_DIR, filters=[("match_id", "==", match_id)])
+    """Reads ONE match's point-level rows from the partitioned cache on demand — reads
+    that match's specific partition file directly (its path is fully determined by
+    match_id) rather than a filtered whole-dataset read. That matters beyond just
+    speed: pyarrow's whole-dataset read resolves ONE schema across all ~5981
+    partitions, and a minority of them (see build_trajectory_cache.py) have extra
+    precomputed-trajectory columns the rest don't — a dataset-wide read silently drops
+    those columns as "not in the common schema" even when filtered down to a match
+    that has them (measured: the cache-hit short-circuit below never triggered until
+    this was fixed to read the single file directly). match_id itself isn't stored in
+    the partition file (it's encoded only in the directory name, per how
+    build_points_cache.py wrote it), so it's added back here.
+    """
+    match_dir = POINTS_CACHE_DIR / f"match_id={quote(match_id, safe='')}"
+    files = sorted(match_dir.glob("*.parquet"))
+    df = pd.read_parquet(files[0])
+    df["match_id"] = match_id
+    return df
 
 
 def _shrink_for_display(df: pd.DataFrame) -> pd.DataFrame:
@@ -277,6 +290,29 @@ def compute_five_engine_trajectory(ctx: ReplayContext, match_id: str) -> dict:
             score_val = day6_row["score"].iloc[0]
             final_score = score_val if pd.notna(score_val) else None
     final_winner_is_p1 = bool(match_df["player1_is_winner"].iloc[0])
+
+    # Precomputed-trajectory cache (see pipelines/build_trajectory_cache.py): the
+    # per-point loop below is dominated by ml_p_player1's Monte Carlo simulation
+    # (~300ms/point measured), too slow for a live free-tier request across a full
+    # match — but fully deterministic (ml_p_player1 is seeded by point index), so for
+    # a curated set of matches (Grand Slam finals) the five probability lists and
+    # ml_informed_prematch_p1 are computed once offline and stored as extra columns
+    # on that match's cached partition. If present, skip straight to the same return
+    # shape the live computation below would produce — same values, just already done.
+    if "markov_p1" in match_df.columns:
+        records = match_df.to_dict("records")
+        return {
+            "match_df": match_df, "records": records,
+            "final_winner_is_p1": final_winner_is_p1,
+            "p1_name": p1_name, "p2_name": p2_name,
+            "tournament": tournament, "tourney_date": tourney_date, "final_score": final_score,
+            "ml_informed_prematch_p1": float(match_df["ml_informed_prematch_p1_cached"].iloc[0]),
+            "markov_p1": match_df["markov_p1"].tolist(),
+            "ml_p1": match_df["ml_p1"].tolist(),
+            "ml_informed_p1": match_df["ml_informed_p1"].tolist(),
+            "ml_informed_unsmoothed_p1": match_df["ml_informed_unsmoothed_p1"].tolist(),
+            "hybrid_p1": match_df["hybrid_p1"].tolist(),
+        }
 
     records = match_df.to_dict("records")
     first_row = records[0]

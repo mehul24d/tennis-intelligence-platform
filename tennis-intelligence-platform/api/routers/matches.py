@@ -14,6 +14,9 @@ genuinely different response shape and purpose, kept in a separate router/file.
 
 from __future__ import annotations
 
+import asyncio
+from functools import partial
+
 from fastapi import APIRouter, HTTPException, Request
 
 from api.schemas.match import MatchReplayResponse, MatchSearchResponse
@@ -28,6 +31,37 @@ from tennis_intel.serving.model_agreement_service import get_model_agreement
 from tennis_intel.serving.point_timeline_service import get_point_timeline
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
+
+# The four endpoints below all end up inside compute_five_engine_trajectory, whose
+# per-point loop is dominated by Monte Carlo simulation — fast for a precomputed match
+# (see pipelines/build_trajectory_cache.py) but potentially minutes long otherwise,
+# especially under a constrained deployment's throttled CPU. Left unbounded, a single
+# slow request can occupy the process long enough that even health checks stop getting
+# answered in time, which is what caused a real crash-and-restart cycle in production
+# (the restart itself then briefly needing 2x memory while the old and new processes
+# overlapped). REPLAY_TIMEOUT_SECONDS bounds a request to fail fast with a clear error
+# instead — the abandoned computation keeps running in its worker thread until it
+# finishes (Python threads can't be forcibly cancelled), but the response returns
+# promptly either way, so the event loop stays free to keep answering health checks.
+REPLAY_TIMEOUT_SECONDS = 25.0
+
+
+async def _run_with_timeout(fn, *args, **kwargs):
+    loop = asyncio.get_running_loop()
+    try:
+        return await asyncio.wait_for(
+            loop.run_in_executor(None, partial(fn, *args, **kwargs)),
+            timeout=REPLAY_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "This match isn't in the precomputed cache and would take too long "
+                "to compute live on this deployment's CPU. Try a Grand Slam final "
+                "instead — those are precomputed and load instantly."
+            ),
+        )
 
 
 @router.get("", response_model=MatchSearchResponse)
@@ -47,21 +81,21 @@ def list_matches(request: Request, search: list[str] | None = None) -> MatchSear
 
 
 @router.get("/{match_id}/replay", response_model=MatchReplayResponse)
-def get_match_replay(match_id: str, request: Request) -> MatchReplayResponse:
+async def get_match_replay(match_id: str, request: Request) -> MatchReplayResponse:
     """
     Full point-by-point replay for one match, across all five prediction engines —
     the data source for the Match Analysis page's centerpiece probability chart.
     """
     ctx = request.app.state.replay_context
     try:
-        result = replay_match_by_id(ctx, match_id)
+        result = await _run_with_timeout(replay_match_by_id, ctx, match_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return MatchReplayResponse(**result)
 
 
 @router.get("/{match_id}/summary", response_model=MatchSummaryResponse)
-def get_match_summary_endpoint(match_id: str, request: Request) -> MatchSummaryResponse:
+async def get_match_summary_endpoint(match_id: str, request: Request) -> MatchSummaryResponse:
     """
     Match Summary card stats — largest comeback, largest probability swing (both
     computed using ML-Informed Markov (smoothed), this project's primary engine — see
@@ -73,14 +107,14 @@ def get_match_summary_endpoint(match_id: str, request: Request) -> MatchSummaryR
     """
     ctx = request.app.state.replay_context
     try:
-        result = get_match_summary(ctx, match_id)
+        result = await _run_with_timeout(get_match_summary, ctx, match_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return MatchSummaryResponse(**result)
 
 
 @router.get("/{match_id}/model-agreement", response_model=ModelAgreementResponse)
-def get_model_agreement_endpoint(match_id: str, request: Request) -> ModelAgreementResponse:
+async def get_model_agreement_endpoint(match_id: str, request: Request) -> ModelAgreementResponse:
     """
     Model Agreement Panel data — per-point highest/lowest/average/std-dev probability
     across all five engines, max disagreement, most/least confident engine, and which
@@ -89,14 +123,14 @@ def get_model_agreement_endpoint(match_id: str, request: Request) -> ModelAgreem
     """
     ctx = request.app.state.replay_context
     try:
-        result = get_model_agreement(ctx, match_id)
+        result = await _run_with_timeout(get_model_agreement, ctx, match_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return ModelAgreementResponse(**result)
 
 
 @router.get("/{match_id}/timeline", response_model=PointTimelineResponse)
-def get_point_timeline_endpoint(
+async def get_point_timeline_endpoint(
     match_id: str, request: Request,
     break_points_only: bool = False, set_points_only: bool = False,
     match_points_only: bool = False, tiebreak_only: bool = False,
@@ -111,8 +145,8 @@ def get_point_timeline_endpoint(
     """
     ctx = request.app.state.replay_context
     try:
-        result = get_point_timeline(
-            ctx, match_id,
+        result = await _run_with_timeout(
+            get_point_timeline, ctx, match_id,
             break_points_only=break_points_only, set_points_only=set_points_only,
             match_points_only=match_points_only, tiebreak_only=tiebreak_only,
             min_swing=min_swing,
