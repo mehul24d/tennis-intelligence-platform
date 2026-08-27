@@ -15,3 +15,38 @@ services:
       - key: ALLOWED_ORIGINS
         sync: false
     healthCheckPath: /api/health
+
+  - type: web
+    name: tennis-intelligence-v2-api
+    runtime: python
+    plan: free
+    rootDir: v2_serving
+    # Installs v2_serving itself, then its two sibling packages (rag_engine,
+    # llm_agent) editable -- same "not on PyPI, installed side-by-side" pattern
+    # their own pyproject.toml comments describe for local dev, just run from
+    # Render's build step instead. main_public.py (not main.py) is the deployed
+    # entrypoint -- see its own module docstring for why: it only wires up the
+    # /query route, skipping video-analysis' jobs/win_probability/media routers
+    # entirely, since those transitively import cv_pipeline -> ultralytics/torch/
+    # mediapipe, measured far too heavy for this free tier (v1's own deployment
+    # history already found frame-by-frame model inference OOMs/times out here).
+    # The chroma vector-index data (rebuilt with Gemini embeddings, not the
+    # original local sentence-transformers model -- see embedder.py's docstring
+    # for why) is bundled the same way v1's backend-data is: too large for git,
+    # published as a GitHub release asset, fetched and extracted at build time.
+    buildCommand: >
+      pip install -e . &&
+      pip install -e ../rag_engine &&
+      pip install -e ../llm_agent &&
+      mkdir -p ../rag_engine/data &&
+      curl -L https://github.com/mehul24d/tennis-intelligence-platform/releases/download/rag-index-v1/rag-index-v1.tar.gz -o /tmp/rag-index.tar.gz &&
+      tar -xzf /tmp/rag-index.tar.gz -C ../rag_engine/data
+    startCommand: uvicorn v2_serving.main_public:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+    healthCheckPath: /health
