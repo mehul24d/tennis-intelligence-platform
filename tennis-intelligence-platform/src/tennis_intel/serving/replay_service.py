@@ -116,7 +116,7 @@ def _shrink_for_display(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _read_parquet_shrunk(path: Path, chunk_size: int = 20) -> pd.DataFrame:
+def _read_parquet_shrunk(path: Path, chunk_size: int = 60) -> pd.DataFrame:
     """
     Reads a parquet file and applies _shrink_for_display, but column-chunk-at-a-time
     instead of reading every column at full precision first — a plain
@@ -132,11 +132,18 @@ def _read_parquet_shrunk(path: Path, chunk_size: int = 20) -> pd.DataFrame:
     ~2x the final size transiently); assigning columns one chunk at a time into an
     existing frame only ever needs that one chunk on top of the result-so-far.
     """
+    import time as _time
     import warnings
     import pyarrow.parquet as pq
 
+    _t0 = _time.monotonic()
     columns = pq.ParquetFile(path).schema_arrow.names
+    n_chunks = (len(columns) + chunk_size - 1) // chunk_size
+    print(f"[startup]   day6: {len(columns)} cols in {n_chunks} chunks of {chunk_size}, "
+          f"schema read at {_time.monotonic() - _t0:.1f}s", flush=True)
+
     result = _shrink_for_display(pd.read_parquet(path, columns=columns[:chunk_size]))
+    print(f"[startup]   day6: chunk 1/{n_chunks} done at {_time.monotonic() - _t0:.1f}s", flush=True)
     with warnings.catch_warnings():
         # Assigning columns one at a time fragments the block manager, which pandas
         # warns is slower for FUTURE column access — a real tradeoff, but the wrong
@@ -145,10 +152,12 @@ def _read_parquet_shrunk(path: Path, chunk_size: int = 20) -> pd.DataFrame:
         # the exact transient memory spike this function exists to avoid, for a frame
         # that's read once at startup and only lightly queried afterward.
         warnings.simplefilter("ignore", pd.errors.PerformanceWarning)
-        for i in range(chunk_size, len(columns), chunk_size):
+        for chunk_num, i in enumerate(range(chunk_size, len(columns), chunk_size), start=2):
             chunk = _shrink_for_display(pd.read_parquet(path, columns=columns[i:i + chunk_size]))
             for c in chunk.columns:
                 result[c] = chunk[c]
+            print(f"[startup]   day6: chunk {chunk_num}/{n_chunks} done at "
+                  f"{_time.monotonic() - _t0:.1f}s", flush=True)
     return result
 
 
