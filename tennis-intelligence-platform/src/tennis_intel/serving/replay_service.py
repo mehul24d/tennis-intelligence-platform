@@ -166,10 +166,20 @@ def load_replay_context() -> ReplayContext:
     2022-2025 folds; top-4 SHAP features unchanged in rank). The prior (pre-retrain)
     classifier is preserved at day9_point_classifiers_PRE_PTWINNER_FIX.joblib.
     """
+    # Timed + flushed: deploying to a CPU/disk-throttled free-tier instance made
+    # startup take far longer than the ~2s measured locally, with no visibility into
+    # which step was slow — this pins it down precisely in the deploy log instead of
+    # guessing from macOS timings again.
+    import os
+    import time as _time
+    _t0 = _time.monotonic()
+
     payload = joblib.load(str(PROCESSED / "day9_point_classifiers.joblib"))
     model, feature_cols = payload[ROLLOUT_MODEL_NAME], payload["feature_cols"]
+    print(f"[startup] model loaded: {_time.monotonic() - _t0:.1f}s", flush=True)
 
     frozen_join = pd.read_parquet(PROCESSED / "joined_matches_m.parquet")
+    print(f"[startup] frozen_join loaded: {_time.monotonic() - _t0:.1f}s", flush=True)
 
     # Memory trim: day6 (646MB at full precision, 294 columns for all 198k ATP
     # matches) is kept in the context ONLY for two display/aggregation purposes — the
@@ -183,10 +193,15 @@ def load_replay_context() -> ReplayContext:
     # column chunks (_read_parquet_shrunk) rather than read-then-downcast, to avoid
     # transiently needing both the full-precision and downcast copies at once.
     day6 = _read_parquet_shrunk(PROCESSED / "matches_with_day6_features.parquet")
+    print(f"[startup] day6 loaded+shrunk: {_time.monotonic() - _t0:.1f}s", flush=True)
 
     # Cheap: just the partition directory names, not a single row of point data read.
-    match_ids = {unquote(p.name.split("=", 1)[1]) for p in POINTS_CACHE_DIR.iterdir()
-                 if p.is_dir() and p.name.startswith("match_id=")}
+    # os.listdir (name only, no per-entry stat) rather than Path.iterdir()+is_dir()
+    # (a stat syscall per entry) — cheap locally, but ~6000 stat calls could matter on
+    # a slower/network-backed disk.
+    match_ids = {unquote(name.split("=", 1)[1]) for name in os.listdir(POINTS_CACHE_DIR)
+                 if name.startswith("match_id=")}
+    print(f"[startup] match_ids listed ({len(match_ids)}): {_time.monotonic() - _t0:.1f}s", flush=True)
 
     return ReplayContext(
         model=model, feature_cols=feature_cols, frozen_join=frozen_join, day6=day6,
