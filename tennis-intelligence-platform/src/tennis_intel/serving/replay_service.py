@@ -96,7 +96,20 @@ def _load_match_points(match_id: str) -> pd.DataFrame:
     """
     match_dir = POINTS_CACHE_DIR / f"match_id={quote(match_id, safe='')}"
     files = sorted(match_dir.glob("*.parquet"))
-    df = pd.read_parquet(files[0])
+    # Debug (temporary — tracking down a parquet-read failure seen only on the actual
+    # deployment, not reproducible locally): report exactly what was found and each
+    # candidate file's size before attempting to read it, since the failure gives no
+    # indication of which file or why.
+    if not files:
+        raise RuntimeError(
+            f"No parquet files found in {match_dir} (exists={match_dir.exists()}, "
+            f"dir contents: {list(match_dir.iterdir()) if match_dir.exists() else 'N/A'})"
+        )
+    sizes = [(f, f.stat().st_size) for f in files]
+    try:
+        df = pd.read_parquet(files[0])
+    except Exception as e:
+        raise RuntimeError(f"Failed reading {files[0]} (sizes found: {sizes}): {e}") from e
     df["match_id"] = match_id
     return df
 
