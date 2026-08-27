@@ -139,64 +139,40 @@ def _shrink_for_display(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _read_parquet_shrunk(path: Path, chunk_size: int = 10) -> pd.DataFrame:
-    """
-    Reads a parquet file and applies _shrink_for_display, but column-chunk-at-a-time
-    instead of reading every column at full precision first — a plain
-    read-then-downcast needs the FULL float64 frame resident (646MB for day6) at the
-    same time as the freshly-downcast one, transiently ~2x the final size. Reading
-    `chunk_size` columns at a time (pyarrow only touches those columns' data on disk)
-    bounds that overlap to one chunk's worth instead of the whole file — measured
-    dropping day6's load-time peak contribution from ~880MB to well under 300MB with
-    an identical final result (same _shrink_for_display, just applied piecewise).
-    Assigns each chunk's columns into a single growing frame rather than collecting
-    all chunks and concatenating at the end — concatenating N already-shrunk chunks
-    still needs all N of them plus the freshly-built result resident at once (back to
-    ~2x the final size transiently); assigning columns one chunk at a time into an
-    existing frame only ever needs that one chunk on top of the result-so-far.
-    """
-    import time as _time
-    import warnings
-    import pyarrow.parquet as pq
-
-    _t0 = _time.monotonic()
-    columns = pq.ParquetFile(path).schema_arrow.names
-    n_chunks = (len(columns) + chunk_size - 1) // chunk_size
-    print(f"[startup]   day6: {len(columns)} cols in {n_chunks} chunks of {chunk_size}, "
-          f"schema read at {_time.monotonic() - _t0:.1f}s", flush=True)
-
-    result = _shrink_for_display(pd.read_parquet(path, columns=columns[:chunk_size]))
-    print(f"[startup]   day6: chunk 1/{n_chunks} done at {_time.monotonic() - _t0:.1f}s, "
-          f"{_rss_mb():.0f}MB", flush=True)
-    with warnings.catch_warnings():
-        # Assigning columns one at a time fragments the block manager, which pandas
-        # warns is slower for FUTURE column access — a real tradeoff, but the wrong
-        # one to "fix" here: the suggested fix (frame.copy() to defragment) needs the
-        # fragmented and defragmented copies resident at once, which would reintroduce
-        # the exact transient memory spike this function exists to avoid, for a frame
-        # that's read once at startup and only lightly queried afterward.
-        warnings.simplefilter("ignore", pd.errors.PerformanceWarning)
-        for chunk_num, i in enumerate(range(chunk_size, len(columns), chunk_size), start=2):
-            chunk = _shrink_for_display(pd.read_parquet(path, columns=columns[i:i + chunk_size]))
-            for c in chunk.columns:
-                result[c] = chunk[c]
-            print(f"[startup]   day6: chunk {chunk_num}/{n_chunks} done at "
-                  f"{_time.monotonic() - _t0:.1f}s, {_rss_mb():.0f}MB", flush=True)
-    return result
-
-
 def load_full_day6() -> pd.DataFrame:
     """
-    Loads the FULL, all-294-column day6 table (fully downcast — see
-    _shrink_for_display), independent of ReplayContext.day6 (which only holds the 7
-    columns compute_five_engine_trajectory's tourney lookup needs). For
+    Loads day6, independent of ReplayContext.day6 (which only holds the 7 columns
+    compute_five_engine_trajectory's tourney lookup needs), for
     career_stats_service's rankings/profile/match-explorer endpoints — called lazily,
     on first request to one of those routes (see
     api/routers/match_list.py's get_career_stats_context/get_match_list_context),
-    NOT at server startup, so this ~235MB cost is only ever paid if those secondary
-    features are actually used.
+    NOT at server startup.
+
+    MEMORY FOOTPRINT (2026-08): this used to load all 294 columns (via
+    _read_parquet_shrunk's column-chunked read) — ~235MB even fully downcast, which
+    reproducibly OOM-killed the live Render deployment the moment this lazy load was
+    actually triggered (a full app boot was already using most of the 512MB free-tier
+    ceiling before this ever ran; the chunked read bounds TRANSIENT overhead during
+    loading, but the final 235MB frame still has to coexist with everything already
+    resident, and that alone was enough). But match_list_service.py and
+    career_stats_service.py (this function's only two callers) between them read only
+    17 of those 294 columns — verified via a full read of both files and everything
+    they call. So this loads exactly that column list directly (a plain
+    pd.read_parquet(columns=[...]), no chunking needed at this size) rather than the
+    full table. Adding a new field to either service that needs another day6 column
+    means adding it here too — pd.read_parquet(columns=...) raises a clear KeyError
+    immediately if a service tries to read a column that wasn't requested here.
     """
-    return _read_parquet_shrunk(PROCESSED / "matches_with_day6_features.parquet")
+    columns = [
+        "tourney_id", "match_num", "winner_id", "loser_id",
+        "winner_name", "loser_name", "tourney_date", "tourney_name",
+        "surface", "round", "tourney_level", "score", "best_of",
+        "elo_pre_match_winner", "elo_pre_match_loser",
+        "elo_surface_pre_match_winner", "elo_surface_pre_match_loser",
+    ]
+    return _shrink_for_display(
+        pd.read_parquet(PROCESSED / "matches_with_day6_features.parquet", columns=columns)
+    )
 
 
 def load_replay_context() -> ReplayContext:
