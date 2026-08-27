@@ -64,3 +64,38 @@ export interface ModelAgreementResponse {
   points: ModelAgreementPoint[];
   disagreement_summary: DisagreementSummary;
 }
+
+export interface PointTimelineEntry {
+  point_index: number;
+  server: string;
+  receiver: string;
+  winner: string;
+  score_before: string | null;
+  set1: number;
+  set2: number;
+  gm1: number;
+  gm2: number;
+  probability_before_p1: number;
+  probability_after_p1: number;
+  probability_swing: number;
+  is_break_point: boolean;
+  is_set_point: boolean;
+  is_match_point: boolean;
+  is_tiebreak_point: boolean;
+  is_largest_swing: boolean;
+}
+
+export interface PointTimelineFilters {
+  break_points_only?: boolean;
+  set_points_only?: boolean;
+  match_points_only?: boolean;
+  tiebreak_only?: boolean;
+  min_swing?: number;
+}
+
+export interface PointTimelineResponse {
+  match_id: string;
+  n_points_total: number;
+  n_points_returned: number;
+  points: PointTimelineEntry[];
+}

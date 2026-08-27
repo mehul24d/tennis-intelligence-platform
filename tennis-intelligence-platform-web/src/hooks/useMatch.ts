@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { matchService } from "@/services/matchService";
+import { PointTimelineFilters } from "@/types/matchAnalysis";
 
 export function useMatchReplay(matchId: string | undefined) {
   return useQuery({
@@ -30,5 +31,13 @@ export function useMatchSearch(searchTerms: string[]) {
     queryKey: ["match-search", searchTerms],
     queryFn: () => matchService.search(searchTerms),
     enabled: searchTerms.length > 0,
+  });
+}
+
+export function usePointTimeline(matchId: string | undefined, filters: PointTimelineFilters) {
+  return useQuery({
+    queryKey: ["match", matchId, "timeline", filters],
+    queryFn: () => matchService.getPointTimeline(matchId as string, filters),
+    enabled: Boolean(matchId),
   });
 }

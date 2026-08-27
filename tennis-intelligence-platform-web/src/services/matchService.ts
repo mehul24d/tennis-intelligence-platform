@@ -3,7 +3,12 @@
 
 import { apiClient } from "@/api/client";
 import { MatchReplayResponse, MatchSearchResponse } from "@/types/match";
-import { MatchSummaryResponse, ModelAgreementResponse } from "@/types/matchAnalysis";
+import {
+  MatchSummaryResponse,
+  ModelAgreementResponse,
+  PointTimelineFilters,
+  PointTimelineResponse,
+} from "@/types/matchAnalysis";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -27,5 +32,15 @@ export const matchService = {
 
   getModelAgreement(matchId: string): Promise<ModelAgreementResponse> {
     return apiClient.get<ModelAgreementResponse>(`/api/matches/${encodeURIComponent(matchId)}/model-agreement`);
+  },
+
+  getPointTimeline(matchId: string, filters: PointTimelineFilters): Promise<PointTimelineResponse> {
+    return apiClient.get<PointTimelineResponse>(`/api/matches/${encodeURIComponent(matchId)}/timeline`, {
+      break_points_only: filters.break_points_only,
+      set_points_only: filters.set_points_only,
+      match_points_only: filters.match_points_only,
+      tiebreak_only: filters.tiebreak_only,
+      min_swing: filters.min_swing,
+    });
   },
 };
