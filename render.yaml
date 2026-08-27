@@ -6,7 +6,7 @@ services:
     rootDir: tennis-intelligence-platform
     buildCommand: >
       pip install -e . &&
-      curl -L https://github.com/mehul24d/tennis-intelligence-platform/releases/download/backend-data-v3/backend-data-v3.tar.gz -o /tmp/backend-data.tar.gz &&
+      curl -L https://github.com/mehul24d/tennis-intelligence-platform/releases/download/backend-data-v4/backend-data-v4.tar.gz -o /tmp/backend-data.tar.gz &&
       tar -xzf /tmp/backend-data.tar.gz -C .
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
