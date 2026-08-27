@@ -168,6 +168,16 @@ def build_point_dataset(
     logger.info("Computing point state (score parsing, situational flags)...")
     points = compute_point_state(points, best_of_map)
 
+    # Memory trim: these raw MCP notation columns are fully consumed by
+    # compute_point_state above (Pts -> p1_points/p2_points/tb_p1_points/tb_p2_points,
+    # 2nd -> is_second_serve_point) and 1st/Notes/TbSet are never read by any function
+    # in point_level_features.py. Dropping them here, before the streak/momentum/
+    # interaction steps and the day6 feature merge below, avoids carrying ~1M rows of
+    # shot-by-shot notation strings (the widest, highest-cardinality columns in the raw
+    # files) through the rest of this pipeline — confirmed via repo-wide grep that
+    # nothing downstream of build_point_dataset reads them either.
+    points = points.drop(columns=["1st", "2nd", "Pts", "Notes", "TbSet"], errors="ignore")
+
     logger.info("Computing in-match momentum...")
     points = compute_in_match_momentum(points)
 

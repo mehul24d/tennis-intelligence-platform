@@ -2,7 +2,7 @@ services:
   - type: web
     name: tennis-intelligence-api
     runtime: python
-    plan: free
+    plan: standard
     rootDir: tennis-intelligence-platform
     buildCommand: >
       pip install -e . &&

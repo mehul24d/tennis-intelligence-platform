@@ -88,6 +88,10 @@ def load_replay_context() -> ReplayContext:
     points = build_point_dataset(POINT_FILES, frozen_join, day6)
     points["player1_is_winner"] = (points["Svr"] == 1) == points["server_is_winner"]
 
+    # Memory trim: match_id is repeated across ~1M point rows but has only ~6000
+    # distinct values — category dtype avoids storing the string once per row.
+    points["match_id"] = points["match_id"].astype("category")
+
     return ReplayContext(
         model=model, feature_cols=feature_cols, frozen_join=frozen_join, day6=day6,
         points=points, match_ids=set(points["match_id"].unique()),
