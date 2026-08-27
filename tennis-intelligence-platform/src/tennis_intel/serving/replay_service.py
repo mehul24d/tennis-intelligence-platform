@@ -25,6 +25,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import unquote
 
 import joblib
 import pandas as pd
@@ -33,7 +34,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "pipelines"))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from tennis_intel.live.build_point_dataset import build_point_dataset
 from tennis_intel.live.return_seed import compute_p_a_return_seed
 from tennis_intel.live.ml_informed_markov import ServeReturnPosterior, build_pretrained_prior
 from tennis_intel.live.hybrid_engine import hybrid_predict
@@ -43,35 +43,121 @@ from tennis_intel.viz.trajectory_events import detect_set_boundaries
 from pipelines.replay_match import (
     markov_p_player1, ml_p_player1, ml_informed_markov_p_player1,
     ml_informed_markov_p_player1_unsmoothed, find_match,
-    PROCESSED, POINT_FILES, ROLLOUT_MODEL_NAME,
+    PROCESSED, ROLLOUT_MODEL_NAME,
 )
 from pipelines.generate_publication_trajectory import (
     compute_composite_prematch_probability, compute_ml_pre_match_probability,
 )
 
+# Per-match point-level data, pre-built ONCE (see pipelines/build_points_cache.py) and
+# partitioned by match_id on disk — see the "memory footprint" note on
+# load_replay_context below for why the live server reads one match's ~175 rows on
+# demand here rather than holding all ~1M rows for all ~6000 matches in RAM at once.
+POINTS_CACHE_DIR = PROCESSED / "points_by_match"
+
 
 @dataclass
 class ReplayContext:
     """Everything the replay computation needs, loaded ONCE and reused across every
-    request — the classifier, feature columns, and the full point-level dataset for
-    every match in the frozen-join corpus. day6 is also kept here (not just
+    request — the classifier and feature columns. day6 is also kept here (not just
     frozen_join) so tennis_intel.serving.match_list_service can build its own
-    enriched match table without re-reading the same parquet file a second time."""
+    enriched match table without re-reading the same parquet file a second time.
+    Per-match point-level data is NOT held here — see POINTS_CACHE_DIR — only the set
+    of match_ids that exist is kept, for existence/search checks."""
     model: object
     feature_cols: list[str]
     frozen_join: pd.DataFrame
     day6: pd.DataFrame
-    points: pd.DataFrame
     match_ids: set[str] = field(default_factory=set)
+
+
+def _load_match_points(match_id: str) -> pd.DataFrame:
+    """Reads ONE match's point-level rows from the partitioned cache on demand —
+    pyarrow's partition pruning means this touches only that match's ~175-row
+    partition on disk, not the full ~1M-row corpus."""
+    return pd.read_parquet(POINTS_CACHE_DIR, filters=[("match_id", "==", match_id)])
+
+
+def _shrink_for_display(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Downcasts a DataFrame's dtypes purely to reduce memory footprint, for a frame
+    that's already done all its precision-sensitive work (feeding a model, feeding
+    arithmetic that compounds over many steps) and is kept around only to be read back
+    out for display/aggregation. float64 -> float32 (~7 significant digits, invisible
+    at any percentage/rating display precision); object columns with meaningfully
+    fewer unique values than rows -> category (repeated strings like tourney names,
+    surfaces, rounds stored once instead of per-row). Mutates columns of the passed-in
+    frame in place (one column at a time, each old array freed as soon as replaced)
+    rather than copying the whole frame first, which would transiently double its
+    memory right when the goal is to shrink it — the caller is expected to discard its
+    own reference to the pre-shrink frame (`day6 = _shrink_for_display(day6)`).
+    """
+    for col in df.columns:
+        dtype = df[col].dtype
+        if dtype == "float64":
+            df[col] = df[col].astype("float32")
+        elif dtype == "object":
+            n = len(df)
+            if n and df[col].nunique(dropna=True) < 0.5 * n:
+                df[col] = df[col].astype("category")
+    return df
+
+
+def _read_parquet_shrunk(path: Path, chunk_size: int = 20) -> pd.DataFrame:
+    """
+    Reads a parquet file and applies _shrink_for_display, but column-chunk-at-a-time
+    instead of reading every column at full precision first — a plain
+    read-then-downcast needs the FULL float64 frame resident (646MB for day6) at the
+    same time as the freshly-downcast one, transiently ~2x the final size. Reading
+    `chunk_size` columns at a time (pyarrow only touches those columns' data on disk)
+    bounds that overlap to one chunk's worth instead of the whole file — measured
+    dropping day6's load-time peak contribution from ~880MB to well under 300MB with
+    an identical final result (same _shrink_for_display, just applied piecewise).
+    Assigns each chunk's columns into a single growing frame rather than collecting
+    all chunks and concatenating at the end — concatenating N already-shrunk chunks
+    still needs all N of them plus the freshly-built result resident at once (back to
+    ~2x the final size transiently); assigning columns one chunk at a time into an
+    existing frame only ever needs that one chunk on top of the result-so-far.
+    """
+    import warnings
+    import pyarrow.parquet as pq
+
+    columns = pq.ParquetFile(path).schema_arrow.names
+    result = _shrink_for_display(pd.read_parquet(path, columns=columns[:chunk_size]))
+    with warnings.catch_warnings():
+        # Assigning columns one at a time fragments the block manager, which pandas
+        # warns is slower for FUTURE column access — a real tradeoff, but the wrong
+        # one to "fix" here: the suggested fix (frame.copy() to defragment) needs the
+        # fragmented and defragmented copies resident at once, which would reintroduce
+        # the exact transient memory spike this function exists to avoid, for a frame
+        # that's read once at startup and only lightly queried afterward.
+        warnings.simplefilter("ignore", pd.errors.PerformanceWarning)
+        for i in range(chunk_size, len(columns), chunk_size):
+            chunk = _shrink_for_display(pd.read_parquet(path, columns=columns[i:i + chunk_size]))
+            for c in chunk.columns:
+                result[c] = chunk[c]
+    return result
 
 
 def load_replay_context() -> ReplayContext:
     """
-    Loads the trained classifier and builds the full point-level dataset ONCE — call
-    this exactly once, at API server startup (e.g. in a FastAPI lifespan/startup
-    event), and pass the resulting ReplayContext into every replay_match_by_id() call.
-    This is the same one-time cost pipelines/replay_match.py pays at the top of its
-    own main(), just factored out so a live server doesn't repeat it per request.
+    Loads the trained classifier ONCE — call this exactly once, at API server startup
+    (e.g. in a FastAPI lifespan/startup event), and pass the resulting ReplayContext
+    into every replay_match_by_id() call.
+
+    MEMORY FOOTPRINT (2026-08): this used to also build the full point-level dataset
+    for ALL ~6000 matches (via build_point_dataset) and hold it in ctx.points for the
+    life of the process — measured at ~590MB resident, on top of day6 and the rest,
+    enough to OOM-kill a 512MB deployment. But per-request, compute_five_engine_trajectory
+    only ever needs ONE match's ~175 points at a time. So the full dataset is now built
+    exactly once, OFFLINE (see pipelines/build_points_cache.py — same build_point_dataset
+    call, same output, just persisted instead of held in RAM), partitioned by match_id
+    on disk at POINTS_CACHE_DIR. The live server reads only the requested match's
+    partition per request (_load_match_points) instead of holding the whole corpus —
+    verified via a before/after diff of replay_match_by_id output across 5 real matches
+    spanning 1969-2023 that this changes no computed probability, since the underlying
+    build_point_dataset computation itself is byte-for-byte unchanged, only where its
+    output lives.
 
     RETRAINED 2026-07-15 on features computed under the corrected, literal PtWinner
     convention (see docs/ptwinner_convention_correction.md's "Retrain results" section
@@ -84,17 +170,27 @@ def load_replay_context() -> ReplayContext:
     model, feature_cols = payload[ROLLOUT_MODEL_NAME], payload["feature_cols"]
 
     frozen_join = pd.read_parquet(PROCESSED / "joined_matches_m.parquet")
-    day6 = pd.read_parquet(PROCESSED / "matches_with_day6_features.parquet")
-    points = build_point_dataset(POINT_FILES, frozen_join, day6)
-    points["player1_is_winner"] = (points["Svr"] == 1) == points["server_is_winner"]
 
-    # Memory trim: match_id is repeated across ~1M point rows but has only ~6000
-    # distinct values — category dtype avoids storing the string once per row.
-    points["match_id"] = points["match_id"].astype("category")
+    # Memory trim: day6 (646MB at full precision, 294 columns for all 198k ATP
+    # matches) is kept in the context ONLY for two display/aggregation purposes — the
+    # tourney-name/date/score lookup below, and career_stats_service's
+    # rankings/profile/match-list endpoints — never fed back into the classifier or
+    # any Markov engine (those consume day6's full float64 precision only inside the
+    # offline build_points_cache.py run, and the resulting per-match cache holds its
+    # own already-computed feature values independent of day6). Safe to downcast for
+    # storage only — verified via a before/after diff of replay_match_by_id output
+    # across 5 real matches spanning 1969-2023: identical results. Read+shrunk in
+    # column chunks (_read_parquet_shrunk) rather than read-then-downcast, to avoid
+    # transiently needing both the full-precision and downcast copies at once.
+    day6 = _read_parquet_shrunk(PROCESSED / "matches_with_day6_features.parquet")
+
+    # Cheap: just the partition directory names, not a single row of point data read.
+    match_ids = {unquote(p.name.split("=", 1)[1]) for p in POINTS_CACHE_DIR.iterdir()
+                 if p.is_dir() and p.name.startswith("match_id=")}
 
     return ReplayContext(
         model=model, feature_cols=feature_cols, frozen_join=frozen_join, day6=day6,
-        points=points, match_ids=set(points["match_id"].unique()),
+        match_ids=match_ids,
     )
 
 
@@ -109,8 +205,7 @@ def search_match_ids(ctx: ReplayContext, search_terms: list[str]) -> list[str]:
     """Thin wrapper around replay_match.py's own find_match logic, but returning ALL
     matches (not raising on multiple matches, since an API caller should get a list to
     choose from, not a CLI-style error)."""
-    ids = ctx.points["match_id"].unique()
-    return sorted(m for m in ids if all(t.lower() in m.lower() for t in search_terms))
+    return sorted(m for m in ctx.match_ids if all(t.lower() in m.lower() for t in search_terms))
 
 
 def compute_five_engine_trajectory(ctx: ReplayContext, match_id: str) -> dict:
@@ -137,7 +232,7 @@ def compute_five_engine_trajectory(ctx: ReplayContext, match_id: str) -> dict:
             f"MCP but not survive the frozen TML join)."
         )
 
-    match_df = ctx.points[ctx.points["match_id"] == match_id].sort_values("Pt").reset_index(drop=True)
+    match_df = _load_match_points(match_id).sort_values("Pt").reset_index(drop=True)
     p1_name = match_id.split("-")[-2].replace("_", " ")
     p2_name = match_id.split("-")[-1].replace("_", " ")
     fj_row = ctx.frozen_join[ctx.frozen_join["mcp_match_id"] == match_id]
