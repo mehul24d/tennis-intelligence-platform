@@ -34,6 +34,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT / "pipelines"))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+
+def _rss_mb() -> float:
+    """Current process resident memory in MB — used only in startup diagnostic
+    prints. resource.ru_maxrss is bytes on macOS but KB on Linux (where this actually
+    deploys), so this isn't hardcoded to one or the other."""
+    import platform
+    import resource
+    raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return raw / 1024 / 1024 if platform.system() == "Darwin" else raw / 1024
+
 from tennis_intel.live.return_seed import compute_p_a_return_seed
 from tennis_intel.live.ml_informed_markov import ServeReturnPosterior, build_pretrained_prior
 from tennis_intel.live.hybrid_engine import hybrid_predict
@@ -116,7 +126,7 @@ def _shrink_for_display(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _read_parquet_shrunk(path: Path, chunk_size: int = 60) -> pd.DataFrame:
+def _read_parquet_shrunk(path: Path, chunk_size: int = 10) -> pd.DataFrame:
     """
     Reads a parquet file and applies _shrink_for_display, but column-chunk-at-a-time
     instead of reading every column at full precision first — a plain
@@ -143,7 +153,8 @@ def _read_parquet_shrunk(path: Path, chunk_size: int = 60) -> pd.DataFrame:
           f"schema read at {_time.monotonic() - _t0:.1f}s", flush=True)
 
     result = _shrink_for_display(pd.read_parquet(path, columns=columns[:chunk_size]))
-    print(f"[startup]   day6: chunk 1/{n_chunks} done at {_time.monotonic() - _t0:.1f}s", flush=True)
+    print(f"[startup]   day6: chunk 1/{n_chunks} done at {_time.monotonic() - _t0:.1f}s, "
+          f"{_rss_mb():.0f}MB", flush=True)
     with warnings.catch_warnings():
         # Assigning columns one at a time fragments the block manager, which pandas
         # warns is slower for FUTURE column access — a real tradeoff, but the wrong
@@ -157,7 +168,7 @@ def _read_parquet_shrunk(path: Path, chunk_size: int = 60) -> pd.DataFrame:
             for c in chunk.columns:
                 result[c] = chunk[c]
             print(f"[startup]   day6: chunk {chunk_num}/{n_chunks} done at "
-                  f"{_time.monotonic() - _t0:.1f}s", flush=True)
+                  f"{_time.monotonic() - _t0:.1f}s, {_rss_mb():.0f}MB", flush=True)
     return result
 
 
@@ -191,17 +202,21 @@ def load_replay_context() -> ReplayContext:
     # Timed + flushed: deploying to a CPU/disk-throttled free-tier instance made
     # startup take far longer than the ~2s measured locally, with no visibility into
     # which step was slow — this pins it down precisely in the deploy log instead of
-    # guessing from macOS timings again.
+    # guessing from macOS timings again. Also prints real RSS at each step: local
+    # macOS measurements have already been wrong twice for estimating Render's actual
+    # Linux container behavior (once too high via phys-footprint, once apparently too
+    # low given how much slower every step ran there) — actual numbers from the
+    # deployment itself are worth more than any more local guessing.
     import os
     import time as _time
     _t0 = _time.monotonic()
 
     payload = joblib.load(str(PROCESSED / "day9_point_classifiers.joblib"))
     model, feature_cols = payload[ROLLOUT_MODEL_NAME], payload["feature_cols"]
-    print(f"[startup] model loaded: {_time.monotonic() - _t0:.1f}s", flush=True)
+    print(f"[startup] model loaded: {_time.monotonic() - _t0:.1f}s, {_rss_mb():.0f}MB", flush=True)
 
     frozen_join = pd.read_parquet(PROCESSED / "joined_matches_m.parquet")
-    print(f"[startup] frozen_join loaded: {_time.monotonic() - _t0:.1f}s", flush=True)
+    print(f"[startup] frozen_join loaded: {_time.monotonic() - _t0:.1f}s, {_rss_mb():.0f}MB", flush=True)
 
     # Memory trim: day6 (646MB at full precision, 294 columns for all 198k ATP
     # matches) is kept in the context ONLY for two display/aggregation purposes — the
@@ -215,7 +230,7 @@ def load_replay_context() -> ReplayContext:
     # column chunks (_read_parquet_shrunk) rather than read-then-downcast, to avoid
     # transiently needing both the full-precision and downcast copies at once.
     day6 = _read_parquet_shrunk(PROCESSED / "matches_with_day6_features.parquet")
-    print(f"[startup] day6 loaded+shrunk: {_time.monotonic() - _t0:.1f}s", flush=True)
+    print(f"[startup] day6 loaded+shrunk: {_time.monotonic() - _t0:.1f}s, {_rss_mb():.0f}MB", flush=True)
 
     # Cheap: just the partition directory names, not a single row of point data read.
     # os.listdir (name only, no per-entry stat) rather than Path.iterdir()+is_dir()
@@ -223,7 +238,8 @@ def load_replay_context() -> ReplayContext:
     # a slower/network-backed disk.
     match_ids = {unquote(name.split("=", 1)[1]) for name in os.listdir(POINTS_CACHE_DIR)
                  if name.startswith("match_id=")}
-    print(f"[startup] match_ids listed ({len(match_ids)}): {_time.monotonic() - _t0:.1f}s", flush=True)
+    print(f"[startup] match_ids listed ({len(match_ids)}): {_time.monotonic() - _t0:.1f}s, "
+          f"{_rss_mb():.0f}MB", flush=True)
 
     return ReplayContext(
         model=model, feature_cols=feature_cols, frozen_join=frozen_join, day6=day6,
