@@ -22,9 +22,6 @@ import time
 from pathlib import Path
 
 import joblib
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -479,6 +476,17 @@ def main() -> None:
     # chosen for readability: Markov (solid, most saturated), ML+MC (dashed), ML-informed
     # variants (solid green family, smoothed vs. unsmoothed distinguished by alpha/dash),
     # hybrid (dotted, since it's a simple post-hoc combination of two lines already shown).
+    # Lazy import: matplotlib is only needed for this CLI plotting step, not for any
+    # of the computational functions this module exposes (markov_p_player1,
+    # ml_p_player1, ml_informed_markov_p_player1, etc.) — those are imported directly
+    # by tennis_intel.serving.replay_service for the live API, which never plots, and
+    # a module-level matplotlib import would make the API pay its full import cost
+    # (measured contributing to a Render free-tier OOM) for a CLI-only feature it
+    # never uses.
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=(14, 6), dpi=150)
     ax.plot(pts, markov_p1, label=f"Markov: P({p1_name} wins)", color="#1f77b4", lw=1.6)
     ax.plot(pts, ml_p1, label=f"ML+MC: P({p1_name} wins)", color="#d62728", lw=1.4,

@@ -13,12 +13,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
-from matplotlib.ticker import MultipleLocator
-
 from tennis_intel.viz.trajectory_generation import MatchTrajectory
 from tennis_intel.viz.trajectory_events import (
     SetBoundary, MatchEvent, detect_set_boundaries, detect_events,
@@ -72,6 +66,18 @@ def plot_trajectory(
     Markov/ML+MC/Hybrid are still computed and stored on MatchTrajectory (build_trajectory
     is unchanged) since that's cheap and harmless, but are no longer drawn here.
     """
+    # Lazy import: matplotlib is only needed for actually rendering a figure, not for
+    # anything else this module or its callers (build_trajectory, the live API's
+    # compute_five_engine_trajectory) do — a module-level import would make every
+    # caller pay matplotlib's full import cost even when just computing probabilities,
+    # not plotting. `global` so _setup_fonts (a separate function) can also see these.
+    global plt, fm, MultipleLocator
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.font_manager as fm
+    from matplotlib.ticker import MultipleLocator
+
     serif, sans = _setup_fonts()
     out_path = Path(out_path)
 
