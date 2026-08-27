@@ -141,8 +141,9 @@ def _shrink_for_display(df: pd.DataFrame) -> pd.DataFrame:
 
 def load_full_day6() -> pd.DataFrame:
     """
-    Loads day6, independent of ReplayContext.day6 (which only holds the 7 columns
-    compute_five_engine_trajectory's tourney lookup needs), for
+    Loads day6, independent of ReplayContext.day6 (which only holds the 10 columns
+    compute_five_engine_trajectory's tourney lookup and rag_engine's point_documents.py
+    need), for
     career_stats_service's rankings/profile/match-explorer endpoints — called lazily,
     on first request to one of those routes (see
     api/routers/match_list.py's get_career_stats_context/get_match_list_context),
@@ -224,10 +225,15 @@ def load_replay_context() -> ReplayContext:
     # Memory trim (2026-08, real numbers from the deployment itself): day6 is 294
     # columns x 198k ATP matches (646MB at full precision, ~235MB even after full
     # downcasting) — but compute_five_engine_trajectory's tourney-name/date/score
-    # lookup below only ever reads 7 of those columns (the 4 join keys plus
-    # tourney_name/tourney_date/score). The other 287 exist purely for
-    # career_stats_service's rankings/profile/match-explorer endpoints, which are
-    # ALREADY lazily loaded on first request to those specific routes (see
+    # lookup below, plus rag_engine's point_documents.py (a separate project that
+    # reuses this same ReplayContext to avoid re-deriving point-timeline data — see
+    # its build_point_documents), only need 10 of those columns (the 4 join keys,
+    # tourney_name/tourney_date/score, and surface/tourney_level/round — the latter
+    # three added back 2026-08 after point_documents.py's own tests caught a
+    # KeyError: 'surface' this trim introduced, a real cross-project consumer this
+    # module's own docstring/comments hadn't accounted for). The other 284 exist
+    # purely for career_stats_service's rankings/profile/match-explorer endpoints,
+    # which are ALREADY lazily loaded on first request to those specific routes (see
     # api/routers/match_list.py's get_career_stats_context/get_match_list_context) —
     # but were still reading the SAME eagerly-loaded, full-294-column ctx.day6 rather
     # than loading their own. Measured on the real deployment: loading all 294
@@ -235,18 +241,19 @@ def load_replay_context() -> ReplayContext:
     # routers/schemas add their own baseline, measured ~591MB total locally when
     # reproduced by booting api.main:app directly rather than testing
     # load_replay_context() in isolation) well past the 512MB free-tier ceiling. So
-    # ctx.day6 now holds ONLY those 7 columns (a few hundred KB, no chunking needed);
-    # get_career_stats_context/get_match_list_context now load a fresh, full,
-    # independently-shrunk day6 (_load_full_day6 below) on first request to those
-    # routes instead of reusing this minimal one — deferring their memory cost to
-    # first actual use of those secondary features rather than paying it for every
-    # server boot regardless of whether anyone visits rankings/profile at all.
+    # ctx.day6 now holds ONLY these 10 columns (still under a megabyte, no chunking
+    # needed); get_career_stats_context/get_match_list_context now load a fresh,
+    # full, independently-shrunk day6 (_load_full_day6 below) on first request to
+    # those routes instead of reusing this minimal one — deferring their memory
+    # cost to first actual use of those secondary features rather than paying it
+    # for every server boot regardless of whether anyone visits rankings/profile at all.
     day6 = pd.read_parquet(
         PROCESSED / "matches_with_day6_features.parquet",
         columns=["tourney_id", "match_num", "winner_id", "loser_id",
-                 "tourney_name", "tourney_date", "score"],
+                 "tourney_name", "tourney_date", "score",
+                 "surface", "tourney_level", "round"],
     )
-    print(f"[startup] day6 (minimal, 7 cols) loaded: {_time.monotonic() - _t0:.1f}s, "
+    print(f"[startup] day6 (minimal, 10 cols) loaded: {_time.monotonic() - _t0:.1f}s, "
           f"{_rss_mb():.0f}MB", flush=True)
 
     # Cheap: just the partition directory names, not a single row of point data read.

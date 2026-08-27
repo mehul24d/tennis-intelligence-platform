@@ -14,7 +14,8 @@ frozen_join and a SEPARATELY, lazily-loaded full day6 (cached on first call, via
 app.state) rather than reloading either parquet file on every request.
 
 ReplayContext.day6 (see replay_service.load_replay_context's own docstring) holds
-only the 7 columns the replay path's tourney lookup needs, not the full 294 — this
+only the 10 columns the replay path's tourney lookup (and rag_engine's
+point_documents.py) need, not the full 294 — this
 router's two context-builders need the full table, so they load their own via
 load_full_day6() on first request, deferring that ~235MB cost to when someone
 actually visits Match Explorer/rankings/player-profile rather than paying it (on top

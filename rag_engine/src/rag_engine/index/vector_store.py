@@ -91,7 +91,7 @@ class VectorStore:
         """filters: a Chroma `where` clause, e.g. {"surface": "Clay"} or
         {"doc_type": "player_profile"} — exact-match metadata filtering, composed with
         semantic similarity (Chroma applies the filter first, then ranks by distance)."""
-        query_embedding = self._embedder.encode([query])[0]
+        query_embedding = self._embedder.encode_query(query)
         results = self._collection.query(
             query_embeddings=[query_embedding], n_results=k, where=filters,
         )
