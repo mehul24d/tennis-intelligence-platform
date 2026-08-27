@@ -172,6 +172,20 @@ def _read_parquet_shrunk(path: Path, chunk_size: int = 10) -> pd.DataFrame:
     return result
 
 
+def load_full_day6() -> pd.DataFrame:
+    """
+    Loads the FULL, all-294-column day6 table (fully downcast — see
+    _shrink_for_display), independent of ReplayContext.day6 (which only holds the 7
+    columns compute_five_engine_trajectory's tourney lookup needs). For
+    career_stats_service's rankings/profile/match-explorer endpoints — called lazily,
+    on first request to one of those routes (see
+    api/routers/match_list.py's get_career_stats_context/get_match_list_context),
+    NOT at server startup, so this ~235MB cost is only ever paid if those secondary
+    features are actually used.
+    """
+    return _read_parquet_shrunk(PROCESSED / "matches_with_day6_features.parquet")
+
+
 def load_replay_context() -> ReplayContext:
     """
     Loads the trained classifier ONCE — call this exactly once, at API server startup
@@ -218,19 +232,33 @@ def load_replay_context() -> ReplayContext:
     frozen_join = pd.read_parquet(PROCESSED / "joined_matches_m.parquet")
     print(f"[startup] frozen_join loaded: {_time.monotonic() - _t0:.1f}s, {_rss_mb():.0f}MB", flush=True)
 
-    # Memory trim: day6 (646MB at full precision, 294 columns for all 198k ATP
-    # matches) is kept in the context ONLY for two display/aggregation purposes — the
-    # tourney-name/date/score lookup below, and career_stats_service's
-    # rankings/profile/match-list endpoints — never fed back into the classifier or
-    # any Markov engine (those consume day6's full float64 precision only inside the
-    # offline build_points_cache.py run, and the resulting per-match cache holds its
-    # own already-computed feature values independent of day6). Safe to downcast for
-    # storage only — verified via a before/after diff of replay_match_by_id output
-    # across 5 real matches spanning 1969-2023: identical results. Read+shrunk in
-    # column chunks (_read_parquet_shrunk) rather than read-then-downcast, to avoid
-    # transiently needing both the full-precision and downcast copies at once.
-    day6 = _read_parquet_shrunk(PROCESSED / "matches_with_day6_features.parquet")
-    print(f"[startup] day6 loaded+shrunk: {_time.monotonic() - _t0:.1f}s, {_rss_mb():.0f}MB", flush=True)
+    # Memory trim (2026-08, real numbers from the deployment itself): day6 is 294
+    # columns x 198k ATP matches (646MB at full precision, ~235MB even after full
+    # downcasting) — but compute_five_engine_trajectory's tourney-name/date/score
+    # lookup below only ever reads 7 of those columns (the 4 join keys plus
+    # tourney_name/tourney_date/score). The other 287 exist purely for
+    # career_stats_service's rankings/profile/match-explorer endpoints, which are
+    # ALREADY lazily loaded on first request to those specific routes (see
+    # api/routers/match_list.py's get_career_stats_context/get_match_list_context) —
+    # but were still reading the SAME eagerly-loaded, full-294-column ctx.day6 rather
+    # than loading their own. Measured on the real deployment: loading all 294
+    # columns here, even fully downcast, pushed a full app boot (FastAPI + all
+    # routers/schemas add their own baseline, measured ~591MB total locally when
+    # reproduced by booting api.main:app directly rather than testing
+    # load_replay_context() in isolation) well past the 512MB free-tier ceiling. So
+    # ctx.day6 now holds ONLY those 7 columns (a few hundred KB, no chunking needed);
+    # get_career_stats_context/get_match_list_context now load a fresh, full,
+    # independently-shrunk day6 (_load_full_day6 below) on first request to those
+    # routes instead of reusing this minimal one — deferring their memory cost to
+    # first actual use of those secondary features rather than paying it for every
+    # server boot regardless of whether anyone visits rankings/profile at all.
+    day6 = pd.read_parquet(
+        PROCESSED / "matches_with_day6_features.parquet",
+        columns=["tourney_id", "match_num", "winner_id", "loser_id",
+                 "tourney_name", "tourney_date", "score"],
+    )
+    print(f"[startup] day6 (minimal, 7 cols) loaded: {_time.monotonic() - _t0:.1f}s, "
+          f"{_rss_mb():.0f}MB", flush=True)
 
     # Cheap: just the partition directory names, not a single row of point data read.
     # os.listdir (name only, no per-entry stat) rather than Path.iterdir()+is_dir()

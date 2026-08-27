@@ -10,8 +10,15 @@ similar-sounding names; kept as separate routers/functions rather than overloadi
 endpoint with two different response shapes depending on query params.
 
 Builds its own MatchListContext lazily from ReplayContext's already-loaded
-frozen_join/day6 (cached on first call, via app.state) rather than reloading either
-parquet file a second time.
+frozen_join and a SEPARATELY, lazily-loaded full day6 (cached on first call, via
+app.state) rather than reloading either parquet file on every request.
+
+ReplayContext.day6 (see replay_service.load_replay_context's own docstring) holds
+only the 7 columns the replay path's tourney lookup needs, not the full 294 — this
+router's two context-builders need the full table, so they load their own via
+load_full_day6() on first request, deferring that ~235MB cost to when someone
+actually visits Match Explorer/rankings/player-profile rather than paying it (on top
+of the replay path's own footprint) for every server boot regardless.
 """
 
 from __future__ import annotations
@@ -20,10 +27,20 @@ from fastapi import APIRouter, Request
 
 from api.schemas.match_list import MatchListResponse
 from api.schemas.full_match_list import FullMatchListResponse
+from tennis_intel.serving.replay_service import load_full_day6
 from tennis_intel.serving.match_list_service import load_match_list_context, get_match_list
 from tennis_intel.serving.career_stats_service import load_career_stats_context, get_full_match_list
 
 router = APIRouter(prefix="/api/matches", tags=["match-list"])
+
+
+def _get_full_day6(request: Request):
+    """Lazily loads and caches the full 294-column day6 table on first call —
+    shared by get_match_list_context and get_career_stats_context so visiting
+    both features in one server lifetime only pays this cost once."""
+    if not hasattr(request.app.state, "full_day6"):
+        request.app.state.full_day6 = load_full_day6()
+    return request.app.state.full_day6
 
 
 def get_match_list_context(request: Request):
@@ -35,7 +52,7 @@ def get_match_list_context(request: Request):
     if not hasattr(request.app.state, "match_list_context"):
         replay_ctx = request.app.state.replay_context
         request.app.state.match_list_context = load_match_list_context(
-            replay_ctx.frozen_join, replay_ctx.day6
+            replay_ctx.frozen_join, _get_full_day6(request)
         )
     return request.app.state.match_list_context
 
@@ -48,8 +65,7 @@ def get_career_stats_context(request: Request):
     See tennis_intel.serving.career_stats_service's own docstring for the full
     reasoning on why these two features specifically need the full corpus."""
     if not hasattr(request.app.state, "career_stats_context"):
-        replay_ctx = request.app.state.replay_context
-        request.app.state.career_stats_context = load_career_stats_context(replay_ctx.day6)
+        request.app.state.career_stats_context = load_career_stats_context(_get_full_day6(request))
     return request.app.state.career_stats_context
 
 
