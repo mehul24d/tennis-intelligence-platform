@@ -70,20 +70,28 @@ class MissingAPIKeyError(RuntimeError):
     is configured — same fail-fast discipline as generate.GeminiClient."""
 
 
-def _is_retryable(exc: BaseException) -> bool:
-    """503 UNAVAILABLE (transient overload) and 429 RESOURCE_EXHAUSTED (free-tier
-    per-minute rate limit — real and expected during a bulk index rebuild's many
-    consecutive calls, unlike generate.GeminiClient's single-call-per-request
-    pattern where a 429 usually means a truly exhausted daily quota instead) are
-    both worth retrying here; 400/401/403 are not (waiting doesn't fix a bad
-    request or a bad key)."""
+def _retry_delay_seconds(exc: BaseException, attempt: int) -> float | None:
+    """Returns None for a non-retryable error (400/401/403 etc — waiting doesn't fix
+    a bad request or a bad key). Otherwise returns how long to sleep before the next
+    attempt: 503 UNAVAILABLE (transient overload) gets a short exponential backoff
+    (1s/2s/4s), same as generate.GeminiClient's own retry. 429 RESOURCE_EXHAUSTED
+    gets a real ~65s wait instead, NOT the same short schedule — this project's
+    free-tier key is capped at 100 embed_content requests per MINUTE (confirmed
+    directly: the error's own quotaId is literally 'EmbedContentRequestsPerMinute
+    PerUserPerProjectPerModel-FreeTier'), and a first version of this function reused
+    generate.GeminiClient's 503-only short schedule for 429 too, which exhausted all
+    4 attempts in under 7 seconds against a limit that needs up to 60s to reset —
+    confirmed by a real rebuild run dying exactly this way, not a theoretical
+    concern. The error response's own 'retryDelay' field was observed as '0s'
+    (unhelpful) on that failing call, so this waits a fixed, empirically-sized 65s
+    rather than trusting that field."""
     from google.genai.errors import ClientError, ServerError
 
     if isinstance(exc, ServerError) and getattr(exc, "code", None) == 503:
-        return True
+        return float(2 ** attempt)
     if isinstance(exc, ClientError) and getattr(exc, "code", None) == 429:
-        return True
-    return False
+        return 65.0
+    return None
 
 
 class GeminiEmbedder:
@@ -112,11 +120,16 @@ class GeminiEmbedder:
             )
         return key
 
+    # initial attempt + 6 retries — sized for the 429 branch (65s each), giving
+    # ~6.5 minutes of total patience for a per-minute quota window to clear during a
+    # bulk rebuild, not just the handful of seconds a 503-only retry schedule needs.
+    MAX_ATTEMPTS = 7
+
     def _embed_batch(self, texts: list[str], task_type: str) -> list[list[float]]:
         from google.genai import types
 
         last_exc: BaseException | None = None
-        for attempt in range(4):  # initial attempt + 3 retries, 1s/2s/4s backoff
+        for attempt in range(self.MAX_ATTEMPTS):
             try:
                 result = self._client.models.embed_content(
                     model=self.model_name,
@@ -126,11 +139,12 @@ class GeminiEmbedder:
                     ),
                 )
                 return [e.values for e in result.embeddings]
-            except Exception as exc:  # noqa: BLE001 -- inspected by _is_retryable, reraised otherwise
-                if not _is_retryable(exc) or attempt == 3:
+            except Exception as exc:  # noqa: BLE001 -- inspected by _retry_delay_seconds, reraised otherwise
+                delay = _retry_delay_seconds(exc, attempt)
+                if delay is None or attempt == self.MAX_ATTEMPTS - 1:
                     raise
                 last_exc = exc
-                time.sleep(2 ** attempt)
+                time.sleep(delay)
         raise last_exc  # unreachable, satisfies type-checkers
 
     def encode(self, texts: list[str]) -> list[list[float]]:

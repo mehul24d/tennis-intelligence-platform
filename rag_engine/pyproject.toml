@@ -16,16 +16,25 @@ dependencies = [
     "pandas>=2.2",
     "pyarrow>=15.0",
     "chromadb>=0.5",
-    "sentence-transformers>=3.0",
+    # google-genai is Google's current, GA (since May 2025) unified Gen AI SDK for
+    # the Gemini API -- NOT google-generativeai, which is deprecated (Nov 30, 2025)
+    # and receives no new-feature support. See generate.py's module docstring. Core
+    # (not an optional "generation" extra) since 2026-08 -- embedder.py's default
+    # embedder is now GeminiEmbedder (see its own module docstring for why), so
+    # google-genai is needed for basic indexing/retrieval too, not just generation.
+    "google-genai>=1.0",
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]
-generation = [
-    # google-genai is Google's current, GA (since May 2025) unified Gen AI SDK for
-    # the Gemini API -- NOT google-generativeai, which is deprecated (Nov 30, 2025)
-    # and receives no new-feature support. See generate.py's module docstring.
-    "google-genai>=1.0",
-    "python-dotenv>=1.0",
+# sentence-transformers (pulls in torch) is no longer needed by default -- only
+# index/embedder.py's local, offline-capable Embedder class uses it, and
+# get_default_embedder() no longer returns that class (see its docstring). Kept
+# installable, not deleted, for offline/no-network use; NOT a core dependency
+# anymore specifically so a memory-constrained deployment's build doesn't pull in
+# torch at all when it never imports Embedder.
+local-embeddings = [
+    "sentence-transformers>=3.0",
 ]
 dev = [
     "pytest>=8.0",

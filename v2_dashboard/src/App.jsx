@@ -4,6 +4,16 @@ import AnalyzeView from "./components/AnalyzeView";
 import ChatView from "./components/ChatView";
 import WinProbabilityPanel from "./components/WinProbabilityPanel";
 
+// VITE_PUBLIC_BUILD (2026-08): the deployed instance talks to main_public.py
+// (see v2_serving's own module docstring), which only wires up the /query
+// route -- /analyze-video and /win-probability don't exist there, since video
+// analysis needs cv_pipeline's YOLO/pose stack, measured too heavy for a
+// free-tier host. Video analysis stays a real, working, LOCAL-only feature
+// (npm run dev against `uvicorn v2_serving.main:app`, VITE_PUBLIC_BUILD unset)
+// -- this flag only controls which views THIS dashboard renders, so a local
+// dev build against the full local API is unchanged.
+const IS_PUBLIC_BUILD = import.meta.env.VITE_PUBLIC_BUILD === "true";
+
 // Step 1 shell: confirm the app can reach v2_serving before building any real
 // feature. Later steps replace this body with the actual views (upload/poll,
 // results, player+overlay, chat, win-probability) behind simple tab state.
@@ -47,17 +57,21 @@ export default function App() {
           )}
         </div>
 
-        <div className="mt-6">
-          <AnalyzeView onJobComplete={setCompletedJob} />
-        </div>
+        {!IS_PUBLIC_BUILD && (
+          <div className="mt-6">
+            <AnalyzeView onJobComplete={setCompletedJob} />
+          </div>
+        )}
 
         <div className="mt-8 border-t border-slate-800 pt-6">
           <ChatView jobId={completedJob?.job_id} jobLabel={completedJob?.video_path?.split("/").pop()} />
         </div>
 
-        <div className="mt-8 border-t border-slate-800 pt-6">
-          <WinProbabilityPanel jobId={completedJob?.job_id} />
-        </div>
+        {!IS_PUBLIC_BUILD && (
+          <div className="mt-8 border-t border-slate-800 pt-6">
+            <WinProbabilityPanel jobId={completedJob?.job_id} />
+          </div>
+        )}
       </main>
     </div>
   );

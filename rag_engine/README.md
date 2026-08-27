@@ -22,9 +22,19 @@ Turns three kinds of v1 data into embeddable, retrievable documents:
   for why (a swing can be dominated by the *next* point's own context, e.g. whether
   it's a second serve, not the traced point's outcome).
 
-Documents are embedded locally (CPU-only, `all-MiniLM-L6-v2` via
-`sentence-transformers`) and stored in a Chroma collection persisted under
-`data/chroma/` — no external service, rebuildable at any time from source parquet.
+Documents are embedded via Gemini's embedding API (`gemini-embedding-001`,
+truncated to 768 dims) by default — see `index/embedder.py`'s module docstring
+for why this replaced the original local `sentence-transformers` model (torch's
+own memory footprint alone exceeded a target deployment's free-tier RAM ceiling).
+A local, offline-capable `Embedder` (CPU-only, `all-MiniLM-L6-v2`) is still
+available — pass `embedder=Embedder()` to `VectorStore()` explicitly, and install
+the `local-embeddings` extra (`pip install -e ".[local-embeddings]"`) — but isn't
+the default anymore, and mixing embedders between index-build and query time
+produces meaningless distances (the two models' vector spaces aren't compatible),
+so pick one and rebuild the index if you switch. Embeddings are stored in a
+Chroma collection persisted under `data/chroma/` — no external vector-store
+service, rebuildable at any time from source parquet (requires network access to
+Gemini's API with the default embedder, though).
 
 ## Usage
 
@@ -68,7 +78,7 @@ current unified Gen AI SDK — see the module's own docstring for why not
 grounded answer.
 
 ```bash
-pip install -e ".[generation]"
+pip install -e .   # google-genai is a core dependency now, not a "generation" extra
 export GEMINI_API_KEY="your-key-here"   # get one at https://ai.google.dev/gemini-api/docs/api-key
 ```
 
