@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, API_BASE_URL } from "./api";
 import AnalyzeView from "./components/AnalyzeView";
 import ChatView from "./components/ChatView";
+import CVShowcase from "./components/CVShowcase";
 import WinProbabilityPanel from "./components/WinProbabilityPanel";
 
 // VITE_PUBLIC_BUILD (2026-08): the deployed instance talks to main_public.py
@@ -60,6 +61,12 @@ export default function App() {
         {!IS_PUBLIC_BUILD && (
           <div className="mt-6">
             <AnalyzeView onJobComplete={setCompletedJob} />
+          </div>
+        )}
+
+        {IS_PUBLIC_BUILD && (
+          <div className="mt-6">
+            <CVShowcase />
           </div>
         )}
 
